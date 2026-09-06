@@ -18,7 +18,7 @@ from starlette.routing import Mount, Route, request_response
 
 from agent_nebula_platform.platform.errors import ConfigurationError
 
-from .security import A2ASecurityRequest, A2AServerSecurityService
+from ..security.security import A2ASecurityRequest, A2AServerSecurityService
 from .server_interfaces import A2AServerInterfacePlan, A2AServerInterfacePlanner
 
 

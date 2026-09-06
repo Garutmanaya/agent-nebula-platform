@@ -10,10 +10,10 @@ ROOT = Path(__file__).resolve().parents[2]
 def test_role_neutral_runtime_settings_are_public() -> None:
     """Require optional client/provider settings and role profile exports."""
 
-    source = (ROOT / "src/agent_nebula_platform/presets/application.py").read_text(
+    source = (ROOT / "src/agent_nebula_platform/platform/presets/application.py").read_text(
         encoding="utf-8"
     )
-    exports = (ROOT / "src/agent_nebula_platform/presets/__init__.py").read_text(
+    exports = (ROOT / "src/agent_nebula_platform/platform/presets/__init__.py").read_text(
         encoding="utf-8"
     )
     assert "oauth_client: RuntimeOAuthClientSettings | None = None" in source
@@ -29,9 +29,9 @@ def test_runtime_owns_provider_security_composition() -> None:
     """Require provider SDK composition and cleanup inside Agent Runtime."""
 
     factory = (
-        ROOT / "src/agent_nebula_platform/oauth/protected_resource/factory.py"
+        ROOT / "src/agent_nebula_platform/security/oauth/protected_resource/factory.py"
     ).read_text(encoding="utf-8")
-    application = (ROOT / "src/agent_nebula_platform/presets/application.py").read_text(
+    application = (ROOT / "src/agent_nebula_platform/platform/presets/application.py").read_text(
         encoding="utf-8"
     )
     assert "JwtAccessTokenValidator" in factory
@@ -44,11 +44,11 @@ def test_runtime_owns_provider_security_composition() -> None:
 def test_runtime_centralizes_path_ownership() -> None:
     """Require runtime-root and product-root resolution in one component."""
 
-    source = (ROOT / "src/agent_nebula_platform/configuration/paths.py").read_text(
+    source = (ROOT / "src/agent_nebula_platform/platform/configuration/paths.py").read_text(
         encoding="utf-8"
     )
     settings = (
-        ROOT / "src/agent_nebula_platform/presets/standalone/settings.py"
+        ROOT / "src/agent_nebula_platform/platform/presets/standalone/settings.py"
     ).read_text(encoding="utf-8")
     assert "class RuntimePathResolver" in source
     assert "def runtime_path" in source
