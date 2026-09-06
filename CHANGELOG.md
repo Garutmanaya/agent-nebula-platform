@@ -1,5 +1,8 @@
 ## Unreleased
 
+- Added explicit `[server.tls]` and `[client.tls]` enablement for A2A transports.
+- Applied the same TLS mode to JSON-RPC, HTTP+JSON, and gRPC; gRPC now selects insecure/secure channels and ports explicitly.
+- Added server/client trust-bundle, certificate, and private-key propagation plus fail-closed TLS configuration validation.
 - Step 7: removed legacy/custom A2A code; A2A 1.0 official SDK path is authoritative.
 - Standardized repository Makefile developer targets.
 

@@ -14,6 +14,7 @@ dependencies = [
 [project.optional-dependencies]
 a2a-grpc = [
   "a2a-sdk[grpc]>=1.1.2,<1.2.0",
+  "grpcio>=1.70.0,<2.0.0",
 ]
 standalone = [
   "uvicorn>=0.30.0,<1.0.0",

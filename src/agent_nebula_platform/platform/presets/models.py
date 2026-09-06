@@ -24,6 +24,9 @@ from agent_nebula_platform.platform.plugins.base import RuntimePlugin
 from agent_nebula_platform.platform.scheduler import ScheduledJob
 from agent_nebula_platform.platform.telemetry import TelemetrySink
 from agent_nebula_platform.protocols.a2a import A2ASecuritySchemeAuthenticator
+from agent_nebula_platform.protocols.a2a.server.configuration.listener import (
+    A2AServerTlsConfiguration,
+)
 from agent_nebula_platform.security.oauth.client import OAuthClientService
 from agent_nebula_platform.security.oauth.metadata import (
     ProtectedResourceMetadataProvider,
@@ -80,6 +83,7 @@ class RuntimeFeatureComponents:
     protected_resource: ProtectedResourceService | None = None
     a2a_agent_card: OfficialA2AAgentCard | None = None
     a2a_request_handler: RequestHandler | None = None
+    a2a_server_tls: A2AServerTlsConfiguration | None = None
     a2a_security_authenticators: tuple[A2ASecuritySchemeAuthenticator, ...] = ()
     a2ui_allowed_components: tuple[str, ...] = ()
     a2ui_allowed_functions: tuple[str, ...] = ()
@@ -107,6 +111,7 @@ class RuntimeFeatureComponents:
         protected_resource: ProtectedResourceService | None = None,
         a2a_agent_card: OfficialA2AAgentCard | None = None,
         a2a_request_handler: RequestHandler | None = None,
+        a2a_server_tls: A2AServerTlsConfiguration | None = None,
         a2a_security_authenticators: Iterable[A2ASecuritySchemeAuthenticator] = (),
         a2ui_allowed_components: Sequence[str] = (),
         a2ui_allowed_functions: Sequence[str] = (),
@@ -133,6 +138,7 @@ class RuntimeFeatureComponents:
             protected_resource=protected_resource,
             a2a_agent_card=a2a_agent_card,
             a2a_request_handler=a2a_request_handler,
+            a2a_server_tls=a2a_server_tls,
             a2a_security_authenticators=tuple(a2a_security_authenticators),
             a2ui_allowed_components=tuple(a2ui_allowed_components),
             a2ui_allowed_functions=tuple(a2ui_allowed_functions),

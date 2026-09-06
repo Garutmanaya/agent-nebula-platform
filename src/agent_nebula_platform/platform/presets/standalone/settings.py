@@ -43,6 +43,7 @@ class StandaloneServerSettings(BaseModel):
     forwarded_prefix_header: str = "X-Forwarded-Prefix"
     ssl_certificate_file: Path | None = None
     ssl_private_key_file: Path | None = None
+    ssl_trust_bundle_file: Path | None = None
 
     @model_validator(mode="after")
     def validate_tls_files(self) -> StandaloneServerSettings:

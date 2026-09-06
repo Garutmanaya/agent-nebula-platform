@@ -162,9 +162,16 @@ class A2AStandaloneApplicationComposer:
                 enable_rest=False,
                 enable_a2a=True,
                 enable_a2ui=False,
-                tls_enabled=listener.certificate_file is not None,
-                ssl_certificate_file=listener.certificate_file,
-                ssl_private_key_file=listener.private_key_file,
+                tls_enabled=listener.tls.enabled,
+                ssl_certificate_file=(
+                    listener.tls.certificate_file if listener.tls.enabled else None
+                ),
+                ssl_private_key_file=(
+                    listener.tls.private_key_file if listener.tls.enabled else None
+                ),
+                ssl_trust_bundle_file=(
+                    listener.tls.trust_bundle if listener.tls.enabled else None
+                ),
             ),
             nebula=nebula_settings,
             state=StandaloneStateSettings(directory=application.runtime_root / "state"),
@@ -194,6 +201,7 @@ class A2AStandaloneApplicationComposer:
             ),
             a2a_agent_card=card,
             a2a_request_handler=handler,
+            a2a_server_tls=listener.tls,
         )
         standalone = build_standalone_agent(settings=settings, components=components)
         return A2AStandaloneApplication(

@@ -41,7 +41,7 @@ class A2AProtectedResourceFactory:
             return None
         if trust_bundle_file is None:
             raise ConfigurationError(
-                "OAuth-protected A2A server requires tls_trust_bundle_file in a2aserver.conf"
+                "OAuth-protected A2A server requires [server.tls].trust_bundle in a2aserver.conf"
             )
         if len(metadata_urls) != 1:
             raise ConfigurationError(

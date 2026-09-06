@@ -73,6 +73,7 @@ class UvicornServerSettings:
     port: int
     certificate_file: Path | None = None
     private_key_file: Path | None = None
+    trust_bundle_file: Path | None = None
     readiness_timeout_seconds: float = 30.0
 
 
@@ -121,6 +122,8 @@ class UvicornRuntimeServer:
             tls_options["ssl_certfile"] = str(self._settings.certificate_file)
         if self._settings.private_key_file is not None:
             tls_options["ssl_keyfile"] = str(self._settings.private_key_file)
+        if self._settings.trust_bundle_file is not None:
+            tls_options["ssl_ca_certs"] = str(self._settings.trust_bundle_file)
 
         config = uvicorn.Config(
             self._app,

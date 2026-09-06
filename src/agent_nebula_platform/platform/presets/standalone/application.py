@@ -36,6 +36,7 @@ class StandaloneAgent:
                 port=server.port,
                 certificate_file=server.ssl_certificate_file,
                 private_key_file=server.ssl_private_key_file,
+                trust_bundle_file=server.ssl_trust_bundle_file,
             ),
         ).run()
 

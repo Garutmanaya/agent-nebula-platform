@@ -1,7 +1,18 @@
-# Complete A2A 1.0 Agent Card configuration template for Agent Runtime.
+# Complete A2A 1.0 server and Agent Card configuration template for Agent Nebula Platform.
 # Keep only the optional sections required by the deployed agent. Environment
-# placeholders are rendered by the container entrypoint before Runtime reads
+# placeholders are rendered by the container entrypoint before Platform reads
 # the resulting a2aserver.conf. Secret material must never be placed here.
+
+[server]
+host = "0.0.0.0"
+port = 9000
+
+# TLS applies uniformly to JSON-RPC, HTTP+JSON, and gRPC bindings.
+[server.tls]
+enabled = true
+trust_bundle = "{{A2A_TLS_TRUST_BUNDLE}}"
+certificate_file = "{{A2A_TLS_CERTIFICATE_FILE}}"
+private_key_file = "{{A2A_TLS_PRIVATE_KEY_FILE}}"
 
 [agent_card]
 name = "{{A2A_AGENT_NAME}}"
@@ -17,7 +28,7 @@ organization = "{{A2A_PROVIDER_ORGANIZATION}}"
 url = "{{A2A_PROVIDER_URL}}"
 
 # The first interface is the preferred interface. Add only interfaces that the
-# deployment actually exposes; Runtime will wire these in Server Step 2.
+# deployment actually exposes; Platform will wire these in Server Step 2.
 [[agent_card.supported_interfaces]]
 url = "{{A2A_JSONRPC_URL}}"
 protocol_binding = "JSONRPC"

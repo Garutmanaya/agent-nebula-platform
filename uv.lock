@@ -47,6 +47,7 @@ dependencies = [
 [package.optional-dependencies]
 a2a-grpc = [
     { name = "a2a-sdk", extra = ["grpc"] },
+    { name = "grpcio" },
 ]
 standalone = [
     { name = "uvicorn" },
@@ -64,6 +65,7 @@ requires-dist = [
     { name = "a2a-sdk", extras = ["http-server"], specifier = ">=1.1.2,<1.2.0" },
     { name = "agent-nebula-sdk", editable = "../agent-nebula-sdk" },
     { name = "fastapi", specifier = ">=0.115.0,<1.0.0" },
+    { name = "grpcio", marker = "extra == 'a2a-grpc'", specifier = ">=1.70.0,<2.0.0" },
     { name = "httpx", specifier = "==0.28.1" },
     { name = "pydantic", specifier = ">=2.11.3,<3.0.0" },
     { name = "pytest", marker = "extra == 'test'", specifier = ">=8.2,<9.0" },

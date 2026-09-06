@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from collections.abc import Awaitable, Callable
+from pathlib import Path
 from typing import Any
 
 from a2a.server.request_handlers import RequestHandler
@@ -19,6 +20,7 @@ from starlette.routing import Mount, Route, request_response
 from agent_nebula_platform.platform.errors import ConfigurationError
 
 from ..security.security import A2ASecurityRequest, A2AServerSecurityService
+from .configuration.listener import A2AServerTlsConfiguration
 from .server_interfaces import A2AServerInterfacePlan, A2AServerInterfacePlanner
 
 
@@ -33,6 +35,7 @@ class A2AServerAdapter:
         request_handler: RequestHandler,
         planner: A2AServerInterfacePlanner | None = None,
         security: A2AServerSecurityService | None = None,
+        tls: A2AServerTlsConfiguration | None = None,
     ) -> None:
         """Store injected server dependencies without starting host infrastructure."""
 
@@ -41,6 +44,7 @@ class A2AServerAdapter:
         self._request_handler = request_handler
         self._planner = planner or A2AServerInterfacePlanner()
         self._security = security
+        self._tls = tls or A2AServerTlsConfiguration()
         self._grpc_servers: list[Any] = []
         self._plan: A2AServerInterfacePlan | None = None
 
@@ -172,13 +176,13 @@ class A2AServerAdapter:
             from a2a.types import a2a_pb2_grpc
         except ImportError as exc:
             raise ConfigurationError(
-                "A2A gRPC interface requires the Runtime 'a2a-grpc' extra"
+                "A2A gRPC interface requires the Platform 'a2a-grpc' extra"
             ) from exc
 
         if self._security is not None and self._security.required:
             raise ConfigurationError(
                 "Secured A2A gRPC interfaces require a gRPC security adapter; "
-                "Runtime will not expose them without one"
+                "Platform will not expose them without one"
             )
 
         for interface in plan.grpc:
@@ -186,7 +190,24 @@ class A2AServerAdapter:
             a2a_pb2_grpc.add_A2AServiceServicer_to_server(
                 GrpcHandler(self._request_handler), server
             )
-            bound_port = server.add_insecure_port(interface.address)
+            if self._tls.enabled:
+                assert self._tls.certificate_file is not None
+                assert self._tls.private_key_file is not None
+                credentials = grpc.ssl_server_credentials(
+                    ((
+                        self._read_tls_bytes(self._tls.private_key_file),
+                        self._read_tls_bytes(self._tls.certificate_file),
+                    ),),
+                    root_certificates=(
+                        self._read_tls_bytes(self._tls.trust_bundle)
+                        if self._tls.trust_bundle is not None
+                        else None
+                    ),
+                    require_client_auth=False,
+                )
+                bound_port = server.add_secure_port(interface.address, credentials)
+            else:
+                bound_port = server.add_insecure_port(interface.address)
             if bound_port == 0:
                 raise ConfigurationError(
                     "A2A gRPC listener could not bind its advertised interface",
@@ -194,3 +215,14 @@ class A2AServerAdapter:
                 )
             await server.start()
             self._grpc_servers.append(server)
+
+    @staticmethod
+    def _read_tls_bytes(path: Path) -> bytes:
+        """Read configured gRPC TLS material and fail with configuration context."""
+
+        try:
+            return path.read_bytes()
+        except OSError as exc:
+            raise ConfigurationError(
+                "Unable to read A2A server TLS material", details={"path": str(path)}
+            ) from exc

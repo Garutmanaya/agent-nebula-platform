@@ -210,6 +210,7 @@ def compose_feature_plugins(
                 request_handler=components.a2a_request_handler,
                 required=settings.a2a is True,
                 security=security,
+                tls=components.a2a_server_tls,
             )
         )
 

@@ -20,8 +20,9 @@ _SUPPORTED_BINDINGS = {
 
 @dataclass(frozen=True, slots=True)
 class A2AClientTlsConfiguration:
-    """TLS material used by outbound A2A transports and Agent Card discovery."""
+    """TLS mode and material used by outbound A2A transports and Agent Card discovery."""
 
+    enabled: bool = False
     trust_bundle: Path | None = None
     certificate_file: Path | None = None
     private_key_file: Path | None = None
@@ -105,6 +106,7 @@ class A2AClientConfigurationLoader:
                 "A2A client timeout_seconds must be greater than zero"
             )
 
+        tls_enabled = self._boolean(tls, "enabled", default=False)
         trust_bundle = self._optional_path(
             tls, "trust_bundle", configuration_path.parent
         )
@@ -117,6 +119,12 @@ class A2AClientConfigurationLoader:
         if (certificate_file is None) != (private_key_file is None):
             raise ConfigurationError(
                 "A2A client TLS certificate_file and private_key_file must be configured together"
+            )
+        if not tls_enabled and any(
+            item is not None for item in (trust_bundle, certificate_file, private_key_file)
+        ):
+            raise ConfigurationError(
+                "A2A client TLS material requires [client.tls].enabled = true"
             )
 
         credentials_table = client.get("credentials", {})
@@ -187,6 +195,7 @@ class A2AClientConfigurationLoader:
             timeout_seconds=float(timeout),
             agent_card_path=agent_card_path,
             tls=A2AClientTlsConfiguration(
+                enabled=tls_enabled,
                 trust_bundle=trust_bundle,
                 certificate_file=certificate_file,
                 private_key_file=private_key_file,

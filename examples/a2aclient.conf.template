@@ -1,4 +1,4 @@
-# Agent Nebula Runtime - A2A 1.0 client configuration.
+# Agent Nebula Platform - A2A 1.0 client configuration.
 # This file configures local client/transport capabilities only. Remote Agent
 # Card security requirements remain authoritative and are negotiated in Step 5.
 
@@ -14,7 +14,8 @@ timeout_seconds = 30.0
 # agent_card_path = ".well-known/agent-card.json"
 
 [client.tls]
-# TLS verification is mandatory. Relative paths are resolved from this file.
+enabled = true
+# When enabled, TLS peer verification is mandatory. Relative paths are resolved from this file.
 # trust_bundle = "../certs/trust/trust-bundle.pem"
 # Omit trust_bundle to use the operating system CA store.
 
@@ -25,7 +26,7 @@ timeout_seconds = 30.0
 # private_key_file = "../secrets/client.key"
 
 # Optional opaque credentials. Table names are arbitrary Agent Card security
-# scheme keys; Runtime never assigns semantics from the key itself.
+# scheme keys; Platform never assigns semantics from the key itself.
 # Secrets remain external files and are never embedded in this configuration.
 # [client.credentials.partner_api]
 # secret_file = "../secrets/partner-api-key"

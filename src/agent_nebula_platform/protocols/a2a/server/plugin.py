@@ -11,6 +11,9 @@ from agent_nebula_platform.platform.plugins.base import RuntimePlugin
 from agent_nebula_platform.protocols.a2a.security.security import (
     A2AServerSecurityService,
 )
+from agent_nebula_platform.protocols.a2a.server.configuration.listener import (
+    A2AServerTlsConfiguration,
+)
 from agent_nebula_platform.protocols.a2a.server.server_adapter import A2AServerAdapter
 
 
@@ -25,6 +28,7 @@ class A2AServerPlugin(RuntimePlugin):
         request_handler: RequestHandler,
         required: bool = True,
         security: A2AServerSecurityService | None = None,
+        tls: A2AServerTlsConfiguration | None = None,
     ) -> None:
         """Capture host-owned app and official A2A server components."""
 
@@ -33,6 +37,7 @@ class A2AServerPlugin(RuntimePlugin):
         self._request_handler = request_handler
         self._required = required
         self._security = security
+        self._tls = tls or A2AServerTlsConfiguration()
 
     @property
     def name(self) -> str:
@@ -54,6 +59,7 @@ class A2AServerPlugin(RuntimePlugin):
             agent_card=self._agent_card,
             request_handler=self._request_handler,
             security=self._security,
+            tls=self._tls,
         )
         await adapter.start()
         context.services.register(self.name, adapter)

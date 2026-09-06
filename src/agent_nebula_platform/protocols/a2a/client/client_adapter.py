@@ -214,7 +214,10 @@ class A2AClientAdapter:
     ) -> httpx.AsyncClient:
         self._ensure_open()
         tls = self._configuration.tls
-        if tls.trust_bundle is None:
+        context: bool | object
+        if not tls.enabled:
+            context = False
+        elif tls.trust_bundle is None:
             import ssl
 
             context = ssl.create_default_context()
@@ -264,6 +267,16 @@ class A2AClientAdapter:
             ) from exc
 
         tls = self._configuration.tls
+        if not tls.enabled:
+
+            def create_insecure_channel(target: str) -> object:
+                """Create a plaintext gRPC channel when transport TLS is disabled."""
+
+                authority = target.removeprefix("grpc://").removeprefix("grpcs://")
+                return grpc.aio.insecure_channel(authority)
+
+            return create_insecure_channel
+
         root_certificates = (
             self._read_bytes(tls.trust_bundle) if tls.trust_bundle is not None else None
         )
@@ -279,13 +292,13 @@ class A2AClientAdapter:
             certificate_chain=certificate_chain,
         )
 
-        def create_channel(target: str) -> object:
+        def create_secure_channel(target: str) -> object:
             """Create a peer-verifying TLS gRPC channel for the selected interface."""
 
             authority = target.removeprefix("grpcs://").removeprefix("grpc://")
             return grpc.aio.secure_channel(authority, credentials)
 
-        return create_channel
+        return create_secure_channel
 
     @staticmethod
     def _read_bytes(path: Path) -> bytes:
