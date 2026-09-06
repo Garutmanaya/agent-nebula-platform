@@ -7,12 +7,15 @@ from .configuration import (
     NebulaTlsSettings,
 )
 from .connector import DisabledNebulaConnector, NebulaConnector, RestNebulaConnector
+from .discovery_service import NebulaDiscoveryService, NebulaDiscoveryServiceFactory
 from .registration import NebulaRegistrationClient
 
 __all__ = [
     "DisabledNebulaConnector",
     "NebulaConfiguration",
     "NebulaConnector",
+    "NebulaDiscoveryService",
+    "NebulaDiscoveryServiceFactory",
     "NebulaRegistrationAuthentication",
     "NebulaRegistrationClient",
     "NebulaRegistrationSettings",

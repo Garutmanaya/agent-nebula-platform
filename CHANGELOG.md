@@ -157,3 +157,11 @@
 - Added the Agent Nebula A2A skill-selection extension for deterministic client-selected `AgentSkill.id` dispatch without changing official A2A wire models.
 - Added multi-skill A2A executor composition while preserving single-skill compatibility.
 - Added skill-aware client security resolution so selected skill security requirements can drive least-privilege credential acquisition.
+
+## P1 client/discovery restoration
+
+- Added a managed Agent Nebula discovery service that keeps Registry HTTPS, TLS,
+  and API-key handling inside Platform.
+- Preserved Registry protected-resource identifiers during discovered A2A OAuth
+  invocation instead of inferring the OAuth resource from an endpoint URL.
+- Aligned the installable A2A SDK baseline to `a2a-sdk>=1.1.2,<1.2.0`.

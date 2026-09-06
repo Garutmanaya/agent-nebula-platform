@@ -52,10 +52,12 @@ class A2ADiscoveredOAuth2CredentialProvider:
         configuration: A2AClientOAuthConfiguration,
         tls: A2AClientTlsConfiguration,
         timeout_seconds: float,
+        resource: str | None = None,
     ) -> None:
         self._configuration = configuration
         self._tls = tls
         self._timeout_seconds = timeout_seconds
+        self._resource_override = resource.rstrip("/") if resource else None
         self._services: dict[str, tuple[OAuthClientService, httpx.AsyncClient]] = {}
         self._registration_lock = asyncio.Lock()
 
@@ -206,8 +208,9 @@ class A2ADiscoveredOAuth2CredentialProvider:
         temporary.chmod(0o600)
         temporary.replace(path)
 
-    @staticmethod
-    def _resource(request: A2AClientSecurityRequest) -> str:
+    def _resource(self, request: A2AClientSecurityRequest) -> str:
+        if self._resource_override is not None:
+            return self._resource_override
         interfaces = tuple(request.agent_card.supported_interfaces)
         if not interfaces:
             raise ConfigurationError("A2A Agent Card has no supported interface")

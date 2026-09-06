@@ -84,6 +84,7 @@ class A2AClientServiceFactory:
                     configuration=configuration.oauth,
                     tls=configuration.tls,
                     timeout_seconds=configuration.timeout_seconds,
+                    resource=resource,
                 )
             )
 
