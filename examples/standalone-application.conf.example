@@ -1,0 +1,45 @@
+[runtime.application]
+name = example-agent
+runtime_root = /opt/example-agent
+
+[runtime.server]
+host = 0.0.0.0
+port = 8443
+api_prefix = /api/v1
+enable_rest = true
+enable_a2a = true
+enable_a2ui = true
+ssl_certificate_file = certs/agent.crt
+ssl_private_key_file = secrets/agent.key
+
+[runtime.nebula]
+base_url = https://nebula.example.com
+ca_file = trust/nebula-root-ca.crt
+client_certificate_file = certs/agent.crt
+client_private_key_file = secrets/agent.key
+timeout_seconds = 30
+
+[runtime.state]
+directory = runtime/state
+
+[runtime.logging]
+console_enabled = true
+logger_name = example_agent.runtime
+level = INFO
+
+[runtime.plugins]
+# Omit values for automatic composition from supplied components.
+# Set true to require a capability or false to disable it explicitly.
+onboarding = false
+oauth_client = false
+protected_resource = false
+skills = true
+agent_card = true
+protected_resource_metadata = true
+health = true
+rest = true
+a2a = true
+a2ui = true
+metrics = true
+telemetry = false
+scheduler = false

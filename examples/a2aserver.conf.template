@@ -1,0 +1,127 @@
+# Complete A2A 1.0 Agent Card configuration template for Agent Runtime.
+# Keep only the optional sections required by the deployed agent. Environment
+# placeholders are rendered by the container entrypoint before Runtime reads
+# the resulting a2aserver.conf. Secret material must never be placed here.
+
+[agent_card]
+name = "{{A2A_AGENT_NAME}}"
+description = "{{A2A_AGENT_DESCRIPTION}}"
+version = "{{A2A_AGENT_VERSION}}"
+documentation_url = "{{A2A_DOCUMENTATION_URL}}"
+icon_url = "{{A2A_ICON_URL}}"
+default_input_modes = ["application/json"]
+default_output_modes = ["application/json"]
+
+[agent_card.provider]
+organization = "{{A2A_PROVIDER_ORGANIZATION}}"
+url = "{{A2A_PROVIDER_URL}}"
+
+# The first interface is the preferred interface. Add only interfaces that the
+# deployment actually exposes; Runtime will wire these in Server Step 2.
+[[agent_card.supported_interfaces]]
+url = "{{A2A_JSONRPC_URL}}"
+protocol_binding = "JSONRPC"
+protocol_version = "1.0"
+tenant = "{{A2A_TENANT}}"
+
+[[agent_card.supported_interfaces]]
+url = "{{A2A_HTTP_JSON_URL}}"
+protocol_binding = "HTTP+JSON"
+protocol_version = "1.0"
+
+[[agent_card.supported_interfaces]]
+url = "{{A2A_GRPC_ADDRESS}}"
+protocol_binding = "GRPC"
+protocol_version = "1.0"
+
+[agent_card.capabilities]
+streaming = true
+push_notifications = true
+extended_agent_card = true
+
+[[agent_card.capabilities.extensions]]
+uri = "{{A2A_EXTENSION_URI}}"
+description = "Example A2A extension configuration"
+required = false
+params = { example = "value" }
+
+# Security scheme keys are arbitrary Agent Card identifiers. Requirements below
+# reference these exact keys. Configure only the schemes supported by the agent.
+[agent_card.security_schemes.api_key.api_key_security_scheme]
+description = "Example API-key scheme"
+location = "header"
+name = "X-API-Key"
+
+[agent_card.security_schemes.http_auth.http_auth_security_scheme]
+description = "Example HTTP authentication scheme"
+scheme = "bearer"
+bearer_format = "JWT"
+
+[agent_card.security_schemes.oauth2.oauth2_security_scheme]
+description = "Example OAuth 2.0 scheme"
+oauth2_metadata_url = "{{OAUTH_METADATA_URL}}"
+
+[agent_card.security_schemes.oauth2.oauth2_security_scheme.flows.authorization_code]
+authorization_url = "{{OAUTH_AUTHORIZATION_URL}}"
+token_url = "{{OAUTH_TOKEN_URL}}"
+refresh_url = "{{OAUTH_REFRESH_URL}}"
+pkce_required = true
+scopes = { "agent.read" = "Read agent resources", "agent.write" = "Modify agent resources" }
+
+[agent_card.security_schemes.oauth2.oauth2_security_scheme.flows.client_credentials]
+token_url = "{{OAUTH_TOKEN_URL}}"
+refresh_url = "{{OAUTH_REFRESH_URL}}"
+scopes = { "agent.read" = "Read agent resources" }
+
+# A2A 1.0 still models implicit and password flows for protocol compatibility.
+# They are deprecated; omit them unless interoperability explicitly requires them.
+[agent_card.security_schemes.oauth2.oauth2_security_scheme.flows.implicit]
+authorization_url = "{{OAUTH_AUTHORIZATION_URL}}"
+refresh_url = "{{OAUTH_REFRESH_URL}}"
+scopes = { "agent.read" = "Read agent resources" }
+
+[agent_card.security_schemes.oauth2.oauth2_security_scheme.flows.password]
+token_url = "{{OAUTH_TOKEN_URL}}"
+refresh_url = "{{OAUTH_REFRESH_URL}}"
+scopes = { "agent.read" = "Read agent resources" }
+
+[agent_card.security_schemes.oauth2.oauth2_security_scheme.flows.device_code]
+device_authorization_url = "{{OAUTH_DEVICE_AUTHORIZATION_URL}}"
+token_url = "{{OAUTH_TOKEN_URL}}"
+refresh_url = "{{OAUTH_REFRESH_URL}}"
+scopes = { "agent.read" = "Read agent resources" }
+
+[agent_card.security_schemes.oidc.open_id_connect_security_scheme]
+description = "Example OpenID Connect scheme"
+open_id_connect_url = "{{OIDC_DISCOVERY_URL}}"
+
+[agent_card.security_schemes.mtls.mtls_security_scheme]
+description = "Example mutual-TLS scheme"
+
+# Each security_requirements table is an OR alternative. Multiple entries in
+# one schemes map are an AND requirement, exactly matching A2A 1.0 semantics.
+[[agent_card.security_requirements]]
+schemes = { oauth2 = ["agent.read"] }
+
+[[agent_card.security_requirements]]
+schemes = { api_key = [], mtls = [] }
+
+[[agent_card.skills]]
+id = "example.read"
+name = "Example Read Skill"
+description = "Demonstrates complete configurable A2A skill metadata."
+tags = ["example", "read"]
+examples = ["Read the example resource"]
+input_modes = ["application/json"]
+output_modes = ["application/json"]
+
+[[agent_card.skills.security_requirements]]
+schemes = { oauth2 = ["agent.read"] }
+
+# Signatures are normally produced after card construction by a signing
+# component. These fields are represented here because the configuration layer
+# supports the complete AgentCard model when precomputed signatures are needed.
+[[agent_card.signatures]]
+protected = "{{A2A_JWS_PROTECTED}}"
+signature = "{{A2A_JWS_SIGNATURE}}"
+header = { kid = "{{A2A_JWS_KEY_ID}}" }

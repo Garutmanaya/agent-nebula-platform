@@ -1,0 +1,42 @@
+[project]
+name = "agent-nebula-platform"
+version = "0.11.1"
+description = "Pluggable secure-agent platform for Agent Nebula-compatible agents."
+requires-python = ">=3.12,<3.13"
+dependencies = [
+  "httpx==0.28.1",
+  "pydantic>=2.11.3,<3.0.0",
+  "fastapi>=0.115.0,<1.0.0",
+  "agent-nebula-sdk>=1.11.0,<2.0.0",
+  "a2a-sdk[http-server]>=1.0.0,<1.1.0",
+]
+
+[project.optional-dependencies]
+a2a-grpc = [
+  "a2a-sdk[grpc]>=1.0.0,<1.1.0",
+]
+standalone = [
+  "uvicorn>=0.30.0,<1.0.0",
+]
+test = [
+  "pytest-asyncio>=0.23",
+  "uvicorn>=0.30.0,<1.0.0",
+  "pytest>=8.2,<9.0",
+  "ruff>=0.8,<1.0",
+]
+
+[tool.uv.sources]
+agent-nebula-sdk = { path = "../agent-nebula-sdk", editable = true }
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+# Source package for the Agent Nebula Platform repository.
+[tool.hatch.build.targets.wheel]
+packages = ["src/agent_nebula_platform"]
+
+[tool.pytest.ini_options]
+pythonpath = ["src"]
+testpaths = ["tests"]
+addopts = "-q"
