@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import inspect
 from collections.abc import Awaitable, Callable, Mapping
-from typing import Protocol, TypeAlias
+from typing import Protocol
 
 from a2a.helpers import get_message_text, new_text_message
 from a2a.server.agent_execution import AgentExecutor, RequestContext
@@ -13,11 +13,11 @@ from google.protobuf.json_format import MessageToDict
 
 from agent_nebula_platform.platform.errors import ConfigurationError
 
-A2ABusinessResult: TypeAlias = Mapping[str, object]
-A2ABusinessHandler: TypeAlias = Callable[
-    [Mapping[str, object]], A2ABusinessResult | Awaitable[A2ABusinessResult]
+type A2ABusinessResult = Mapping[str, object]
+type A2ABusinessHandler = Callable[
+    [Mapping[str, object]],
+    A2ABusinessResult | Awaitable[A2ABusinessResult],
 ]
-
 
 class A2AExecutableSkill(Protocol):
     """Minimal skill contract required by the A2A execution adapter."""

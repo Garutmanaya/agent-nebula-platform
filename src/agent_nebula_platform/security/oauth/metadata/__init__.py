@@ -4,9 +4,8 @@ from .authorization_server import (
     AuthorizationServerMetadata,
     AuthorizationServerMetadataResolver,
 )
-from .factory import ProtectedResourceMetadataFactory
-
 from .builders import ProtectedResourceMetadataBuilder
+from .factory import ProtectedResourceMetadataFactory
 from .metadata import (
     ProtectedResourceMetadataDocument,
     ProtectedResourceMetadataProvider,
@@ -17,9 +16,9 @@ __all__ = [
     "AuthorizationServerConnection",
     "AuthorizationServerMetadata",
     "AuthorizationServerMetadataResolver",
-    "ProtectedResourceMetadataFactory",
     "ProtectedResourceMetadataBuilder",
     "ProtectedResourceMetadataDocument",
+    "ProtectedResourceMetadataFactory",
     "ProtectedResourceMetadataProvider",
     "StaticProtectedResourceMetadataProvider",
 ]

@@ -1,6 +1,5 @@
 """A2A 1.0 server configuration, execution, composition, and transport integration."""
 
-from .composition import A2AStandaloneApplication, A2AStandaloneApplicationComposer
 from .configuration import (
     A2AAgentCardFactory,
     A2AAgentCardValidator,
@@ -27,6 +26,4 @@ __all__ = [
     "A2AServerInterfacePlan",
     "A2AServerInterfacePlanner",
     "A2AServerPlugin",
-    "A2AStandaloneApplication",
-    "A2AStandaloneApplicationComposer",
 ]

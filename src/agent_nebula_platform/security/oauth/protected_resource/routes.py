@@ -8,7 +8,10 @@ from fastapi import FastAPI, Request
 from fastapi.responses import JSONResponse
 from starlette.routing import compile_path
 
-from agent_nebula_platform.platform.errors import AuthenticationError, AuthorizationError
+from agent_nebula_platform.platform.errors import (
+    AuthenticationError,
+    AuthorizationError,
+)
 from agent_nebula_platform.platform.transport.http import RequestTargetResolver
 
 from .models import ProtectedResourceRequest
