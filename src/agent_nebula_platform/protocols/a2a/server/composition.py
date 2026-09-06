@@ -34,6 +34,10 @@ from agent_nebula_platform.platform.presets.standalone.application import (
 from agent_nebula_platform.platform.presets.standalone.settings import (
     StandaloneServerSettings,
 )
+from agent_nebula_platform.protocols.a2a.extensions import (
+    ensure_skill_selection_extension,
+    validate_executable_skills,
+)
 from agent_nebula_platform.protocols.a2a.security.protected_resource import (
     A2AProtectedResourceComposition,
     A2AProtectedResourceFactory,
@@ -106,22 +110,31 @@ class A2AStandaloneApplicationComposer:
         *,
         application_config: Path,
         server_config: Path,
-        skill: A2AExecutableSkill,
+        skill: A2AExecutableSkill | None = None,
+        skills: tuple[A2AExecutableSkill, ...] = (),
         nebula_config: Path | None = None,
     ) -> A2AStandaloneApplication:
         """Build a standalone A2A application without developer-facade logic."""
 
         card = A2AServerConfigurationService().load_agent_card(server_config)
-        configured_skill_ids = {published.id for published in card.skills}
-        if skill.skill_id not in configured_skill_ids:
-            from agent_nebula_platform.platform.errors import ConfigurationError
+        # Backward compatibility keeps the former single ``skill`` composition
+        # call valid while SecureAgent migrates to passing all registered skills.
+        executable_skills = skills or ((skill,) if skill is not None else ())
+        validate_executable_skills(
+            card, tuple(executable.skill_id for executable in executable_skills)
+        )
 
-            raise ConfigurationError(
-                f"Skill '{skill.skill_id}' is not published by a2aserver.conf"
-            )
+        # NEBULA A2A EXTENSION: multi-skill deterministic providers require
+        # explicit client-side AgentSkill selection. Single-skill providers
+        # advertise the same extension as optional and remain usable by generic
+        # A2A clients that send ordinary messages without extension metadata.
+        ensure_skill_selection_extension(
+            card, required=len(executable_skills) > 1
+        )
+
         listener = A2AListenerConfigurationLoader().load(server_config)
         handler = DefaultRequestHandler(
-            agent_executor=A2AAgentExecutor(skill),
+            agent_executor=A2AAgentExecutor(executable_skills),
             task_store=InMemoryTaskStore(),
             agent_card=card,
         )

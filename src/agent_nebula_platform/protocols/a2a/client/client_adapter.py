@@ -8,13 +8,28 @@ from typing import TYPE_CHECKING, Any
 from uuid import uuid4
 
 import httpx
-from a2a.client import A2ACardResolver, Client, ClientConfig, ClientFactory
+from a2a.client import (
+    A2ACardResolver,
+    Client,
+    ClientCallContext,
+    ClientConfig,
+    ClientFactory,
+)
+from a2a.client.service_parameters import (
+    ServiceParametersFactory,
+    with_a2a_extensions,
+)
 from a2a.types import AgentCard, Message, Part, Role, SendMessageRequest
 from a2a.utils.constants import TransportProtocol
 from google.protobuf.json_format import MessageToDict, ParseDict
 from google.protobuf.struct_pb2 import Value
 
 from agent_nebula_platform.platform.errors import ConfigurationError
+from agent_nebula_platform.protocols.a2a.extensions import (
+    NEBULA_SKILL_SELECTION_EXTENSION_URI,
+    build_skill_selection_metadata,
+    require_supported_skill,
+)
 from agent_nebula_platform.platform.tls import FileTlsContextProvider
 
 from .client_configuration import A2AClientConfiguration
@@ -58,17 +73,21 @@ class A2AClientAdapter:
         base_url: str,
         *,
         interceptors: list[ClientCallInterceptor] | None = None,
+        skill_id: str | None = None,
     ) -> Client:
         """Resolve the remote card and create an official A2A client for it."""
 
         card = await self.resolve_agent_card(base_url)
-        return self.create(card, interceptors=interceptors)
+        if skill_id is not None:
+            require_supported_skill(card, skill_id)
+        return self.create(card, interceptors=interceptors, skill_id=skill_id)
 
     def create(
         self,
         agent_card: AgentCard,
         *,
         interceptors: list[ClientCallInterceptor] | None = None,
+        skill_id: str | None = None,
     ) -> Client:
         """Create an official client from an already resolved Agent Card."""
 
@@ -77,7 +96,9 @@ class A2AClientAdapter:
             streaming=self._configuration.streaming,
             polling=self._configuration.polling,
             # Official HTTP transports own and close this client with the A2A Client.
-            httpx_client=self._new_http_client(agent_card=agent_card),
+            httpx_client=self._new_http_client(
+                agent_card=agent_card, skill_id=skill_id
+            ),
             grpc_channel_factory=self._grpc_channel_factory(),
             supported_protocol_bindings=list(
                 self._configuration.supported_protocol_bindings
@@ -108,12 +129,14 @@ class A2AClientAdapter:
         data: Mapping[str, Any] | None = None,
         context_id: str | None = None,
         task_id: str | None = None,
+        skill_id: str | None = None,
     ) -> tuple[dict[str, Any], ...]:
         """Send one official A2A ``SendMessageRequest`` and normalize responses.
 
-        Runtime owns protobuf construction so higher-level facades do not depend
-        on A2A wire models. No skill identifier is injected because A2A 1.0 does
-        not define deterministic skill selection on ``SendMessage``.
+        Platform owns protobuf construction so higher-level facades do not depend
+        on A2A wire models. When ``skill_id`` is supplied, Platform uses the formal
+        Agent Nebula A2A skill-selection extension rather than changing any core
+        A2A model. The client remains responsible for selecting the skill.
         """
 
         if text is None and data is None:
@@ -128,19 +151,38 @@ class A2AClientAdapter:
             parts.append(Part(text=normalized))
         if data is not None:
             parts.append(Part(data=ParseDict(dict(data), Value())))
-        request = SendMessageRequest(
-            message=Message(
+        # NEBULA A2A EXTENSION: the selected AgentSkill.id is request semantics,
+        # not user content. It is therefore carried in SendMessageRequest.metadata
+        # and activated using the official A2A-Extensions service parameter.
+        card = await self.resolve_agent_card(base_url)
+        context = None
+        metadata = None
+        if skill_id is not None:
+            require_supported_skill(card, skill_id)
+            metadata = build_skill_selection_metadata(skill_id)
+            context = ClientCallContext(
+                state={"agent_nebula.a2a.skill_id": skill_id},
+                service_parameters=ServiceParametersFactory.create(
+                    [with_a2a_extensions([NEBULA_SKILL_SELECTION_EXTENSION_URI])]
+                ),
+            )
+
+        request_arguments: dict[str, Any] = {
+            "message": Message(
                 message_id=str(uuid4()),
                 context_id=context_id or "",
                 task_id=task_id or "",
                 role=Role.ROLE_USER,
                 parts=parts,
             )
-        )
-        client = await self.connect(base_url)
+        }
+        if metadata is not None:
+            request_arguments["metadata"] = metadata
+        request = SendMessageRequest(**request_arguments)
+        client = self.create(card, skill_id=skill_id)
         responses: list[dict[str, Any]] = []
         try:
-            async for response in client.send_message(request):
+            async for response in client.send_message(request, context=context):
                 responses.append(
                     MessageToDict(response, preserving_proto_field_name=True)
                 )
@@ -158,7 +200,7 @@ class A2AClientAdapter:
             await self._security_interceptor.close()
 
     def _new_http_client(
-        self, *, agent_card: AgentCard | None = None
+        self, *, agent_card: AgentCard | None = None, skill_id: str | None = None
     ) -> httpx.AsyncClient:
         self._ensure_open()
         tls = self._configuration.tls
@@ -187,6 +229,7 @@ class A2AClientAdapter:
                     http_method=request.method,
                     target_uri=str(request.url),
                     headers=request.headers,
+                    skill_id=skill_id,
                 )
 
             event_hooks = {"request": [apply_request_security]}

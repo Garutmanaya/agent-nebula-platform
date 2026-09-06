@@ -93,3 +93,7 @@ Generic deployment/runtime settings remain separate from A2A protocol settings. 
 ## Extension rule
 
 New A2A-specific behavior belongs under `protocols/a2a/`. Reusable OAuth or security behavior must not be implemented there merely because A2A consumes it; it belongs under `security/` or `agent-nebula-sdk` according to responsibility.
+
+## Agent Nebula deterministic skill selection
+
+Multi-skill deterministic providers use the formal Agent Nebula A2A skill-selection extension rather than modifying core A2A request models. Skill selection occurs on the client; the provider validates and dispatches the selected advertised `AgentSkill.id`. See [Agent Nebula A2A Skill-Selection Extension](a2a-skill-selection-extension.md) for the complete wire contract, security behavior, failure semantics, and compatibility rules.

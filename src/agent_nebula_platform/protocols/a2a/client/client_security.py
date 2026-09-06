@@ -70,10 +70,25 @@ class A2AClientSecurityResolver:
         self._providers = providers
 
     def resolve(
-        self, *, agent_card: AgentCard, method: str
+        self, *, agent_card: AgentCard, method: str, skill_id: str | None = None
     ) -> A2AResolvedSecurityRequirement:
-        """Select the first advertised requirement fully satisfiable by local providers."""
+        """Select the first satisfiable card- or skill-level security requirement.
+
+        NEBULA A2A EXTENSION: when the client has explicitly selected an
+        advertised skill, that skill's security requirements take precedence.
+        This lets credential providers request least-privilege skill scopes
+        before the A2A message is sent. If the skill does not override security,
+        normal Agent Card requirements remain authoritative.
+        """
         requirements = tuple(agent_card.security_requirements)
+        if skill_id is not None:
+            skill = next((item for item in agent_card.skills if item.id == skill_id), None)
+            if skill is None:
+                raise ConfigurationError(
+                    f"A2A skill is not advertised by the remote agent: {skill_id}"
+                )
+            if skill.security_requirements:
+                requirements = tuple(skill.security_requirements)
         if not requirements:
             return A2AResolvedSecurityRequirement(())
 
@@ -148,8 +163,13 @@ class A2AClientSecurityInterceptor(ClientCallInterceptor):
 
     async def before(self, args: BeforeArgs) -> None:
         """Resolve OR-of-AND requirements and merge every credential in the selected AND-group."""
+        skill_id = None
+        if args.context is not None:
+            value = args.context.state.get("agent_nebula.a2a.skill_id")
+            if isinstance(value, str):
+                skill_id = value
         resolved = self._resolver.resolve(
-            agent_card=args.agent_card, method=args.method
+            agent_card=args.agent_card, method=args.method, skill_id=skill_id
         )
         if not resolved.schemes:
             return
@@ -183,6 +203,7 @@ class A2AClientSecurityInterceptor(ClientCallInterceptor):
         http_method: str,
         target_uri: str,
         headers,
+        skill_id: str | None = None,
     ) -> None:
         """Refresh request-bound credentials using the final HTTP method and URI.
 
@@ -192,7 +213,9 @@ class A2AClientSecurityInterceptor(ClientCallInterceptor):
         carries the proof. Other credentials remain unchanged.
         """
 
-        resolved = self._resolver.resolve(agent_card=agent_card, method="http_request")
+        resolved = self._resolver.resolve(
+            agent_card=agent_card, method="http_request", skill_id=skill_id
+        )
         normalized_target = _dpop_target_uri(target_uri)
         for security_request in resolved.schemes:
             provider = self._resolver.provider_for(security_request)

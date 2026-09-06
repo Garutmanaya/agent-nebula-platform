@@ -32,17 +32,23 @@ class A2AExecutableSkill(Protocol):
 
 
 class A2AAgentExecutor(AgentExecutor):
-    """Adapt a protocol-neutral business skill to official A2A execution.
+    """Dispatch official A2A messages to registered deterministic business skills.
 
-    A2A 1.0 ``SendMessage`` does not carry a standard skill identifier.  This
-    adapter therefore executes the skill selected by composition and does not
-    invent proprietary message metadata for routing.
+    NEBULA A2A EXTENSION: A2A core does not define a ``skill_id`` field on
+    SendMessageRequest. Multi-skill SecureAgent providers therefore use the
+    formal Agent Nebula skill-selection extension. The client selects an
+    advertised AgentSkill.id; this executor only validates and dispatches that
+    explicit selection. It never performs natural-language or LLM routing.
     """
 
-    def __init__(self, skill: A2AExecutableSkill) -> None:
-        """Bind one already-selected executable skill."""
+    def __init__(self, skills: tuple[A2AExecutableSkill, ...]) -> None:
+        """Bind executable skills by their stable advertised identifiers."""
 
-        self._skill = skill
+        if not skills:
+            raise ConfigurationError("A2A AgentExecutor requires at least one skill")
+        self._skills = {skill.skill_id: skill for skill in skills}
+        if len(self._skills) != len(skills):
+            raise ConfigurationError("A2A AgentExecutor skill identifiers must be unique")
 
     async def execute(self, context: RequestContext, event_queue: EventQueue) -> None:
         """Translate an A2A message into the generic business-handler payload."""
@@ -56,12 +62,34 @@ class A2AAgentExecutor(AgentExecutor):
                     data = MessageToDict(part.data)
                     if isinstance(data, dict):
                         payload.update(data)
-        result = self._skill.handler(payload)
+        # NEBULA A2A EXTENSION: selection is made by the client and carried in
+        # standards-compliant SendMessageRequest.metadata. For a single-skill
+        # provider the extension remains optional for generic A2A interoperability.
+        from agent_nebula_platform.protocols.a2a.extensions import selected_skill_id
+
+        skill_id = selected_skill_id(
+            metadata=context.metadata,
+            requested_extensions=context.requested_extensions,
+        )
+        if skill_id is None:
+            if len(self._skills) != 1:
+                raise ConfigurationError(
+                    "Multi-skill A2A agent requires the Nebula skill-selection extension"
+                )
+            skill = next(iter(self._skills.values()))
+        else:
+            skill = self._skills.get(skill_id)
+            if skill is None:
+                raise ConfigurationError(
+                    f"Selected A2A skill is not registered: {skill_id}"
+                )
+
+        result = skill.handler(payload)
         if inspect.isawaitable(result):
             result = await result
         if not isinstance(result, Mapping):
             raise ConfigurationError(
-                f"A2A skill '{self._skill.skill_id}' must return a mapping/dict"
+                f"A2A skill '{skill.skill_id}' must return a mapping/dict"
             )
         await event_queue.enqueue_event(new_text_message(self._response_text(result)))
 

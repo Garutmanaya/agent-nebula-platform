@@ -151,3 +151,9 @@
 
 - Composed Step 5 security providers automatically in `A2AClientServiceFactory`.
 - Added Runtime-owned standard `SendMessageRequest` construction/response normalization for thin higher-level facades.
+
+## Unreleased
+
+- Added the Agent Nebula A2A skill-selection extension for deterministic client-selected `AgentSkill.id` dispatch without changing official A2A wire models.
+- Added multi-skill A2A executor composition while preserving single-skill compatibility.
+- Added skill-aware client security resolution so selected skill security requirements can drive least-privilege credential acquisition.

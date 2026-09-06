@@ -21,3 +21,5 @@ agent-nebula-platform
         ↓
 agent-nebula-sdk
 ```
+
+- [Agent Nebula A2A Skill-Selection Extension](a2a-skill-selection-extension.md) — deterministic client-selected `AgentSkill.id` dispatch using the official A2A extension mechanism.
