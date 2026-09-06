@@ -48,7 +48,7 @@ class A2AClientOAuthConfiguration:
 
 @dataclass(frozen=True, slots=True)
 class A2AClientConfiguration:
-    """Runtime-owned settings mapped to the official A2A ``ClientConfig``."""
+    """Platform-owned settings mapped to the official A2A ``ClientConfig``."""
 
     streaming: bool
     polling: bool

@@ -1,4 +1,4 @@
-"""Official A2A 1.0 client construction owned by Agent Runtime."""
+"""Official A2A 1.0 client construction owned by Agent Nebula Platform."""
 
 from __future__ import annotations
 
@@ -42,7 +42,7 @@ if TYPE_CHECKING:
 class A2AClientAdapter:
     """Resolve standard Agent Cards and construct official transport clients.
 
-    Security negotiation is supplied through a Runtime interceptor that evaluates
+    Security negotiation is supplied through a Platform interceptor that evaluates
     the remote Agent Card without modifying official A2A protocol models.
     """
 
@@ -52,7 +52,7 @@ class A2AClientAdapter:
         *,
         security_interceptor: A2AClientSecurityInterceptor | None = None,
     ) -> None:
-        """Create one reusable client adapter from validated Runtime configuration."""
+        """Create one reusable client adapter from validated Platform configuration."""
 
         self._configuration = configuration
         self._security_interceptor = security_interceptor
@@ -67,6 +67,16 @@ class A2AClientAdapter:
             return await resolver.get_agent_card(
                 relative_card_path=self._configuration.agent_card_path
             )
+
+    async def resolve_agent_card_document(self, base_url: str) -> dict[str, Any]:
+        """Resolve an Agent Card and return its protocol-neutral JSON representation.
+
+        Higher-level facades use this operation so they do not need to import
+        official A2A protobuf models or protobuf serialization utilities.
+        """
+
+        card = await self.resolve_agent_card(base_url)
+        return MessageToDict(card, preserving_proto_field_name=True)
 
     async def connect(
         self,
@@ -191,7 +201,7 @@ class A2AClientAdapter:
         return tuple(responses)
 
     async def close(self) -> None:
-        """Close Runtime-owned transport resources idempotently."""
+        """Close Platform-owned transport resources idempotently."""
 
         if self._closed:
             return
@@ -250,7 +260,7 @@ class A2AClientAdapter:
             import grpc
         except ImportError as exc:
             raise ConfigurationError(
-                'A2A gRPC client support requires the Runtime "a2a-grpc" extra'
+                'A2A gRPC client support requires the Platform "a2a-grpc" extra'
             ) from exc
 
         tls = self._configuration.tls

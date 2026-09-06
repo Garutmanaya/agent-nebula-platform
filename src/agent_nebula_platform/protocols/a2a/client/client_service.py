@@ -21,7 +21,7 @@ from .discovered_oauth import A2ADiscoveredOAuth2CredentialProvider
 
 
 class A2AClientServiceFactory:
-    """Create fully secured Runtime A2A clients from external configuration.
+    """Create fully secured Platform A2A clients from external configuration.
 
     The factory is the composition boundary between Step 4 transport configuration
     and Step 5 security negotiation.  Callers do not need to know about individual
@@ -42,7 +42,7 @@ class A2AClientServiceFactory:
 
         ``resource`` is the protected-resource identifier selected by discovery.
         It is deliberately supplied by the caller rather than inferred from an
-        arbitrary Agent Card URL.  OAuth is available only when both a Runtime
+        arbitrary Agent Card URL.  OAuth is available only when both a Platform
         OAuth client service and that resource identifier are present.
         """
 
