@@ -11,40 +11,15 @@ from collections.abc import Mapping
 from pathlib import Path
 from typing import Any
 
-import httpx
-
-from agent_nebula_platform.platform.tls import FileTlsContextProvider
-
-from .configuration import NebulaConfiguration, NebulaRegistrationAuthentication
-from .connector import RestNebulaConnector
+from .configuration import NebulaConfiguration
+from .transport import NebulaConnectorFactory
 
 
 class NebulaDiscoveryService:
     """Own verified Registry transport and expose only discovery operations."""
 
     def __init__(self, configuration: NebulaConfiguration) -> None:
-        tls = configuration.tls
-        tls_context = FileTlsContextProvider(
-            ca_file=tls.ca_file,
-            certificate_file=tls.client_certificate_file,
-            private_key_file=tls.client_private_key_file,
-        ).create_client_context()
-        headers: dict[str, str] = {}
-        registration = configuration.registration
-        if registration.authentication is NebulaRegistrationAuthentication.API_KEY:
-            assert registration.api_key_file is not None
-            api_key = registration.api_key_file.read_text(encoding="utf-8").strip()
-            if not api_key:
-                raise ValueError("Nebula API key file is empty")
-            headers["X-API-Key"] = api_key
-        self._client = httpx.AsyncClient(
-            verify=tls_context,
-            timeout=httpx.Timeout(configuration.timeout_seconds),
-            headers=headers,
-        )
-        self._connector = RestNebulaConnector(
-            base_url=configuration.base_url, client=self._client
-        )
+        self._connector = NebulaConnectorFactory.create(configuration)
         self._closed = False
 
     async def search(self, parameters: Mapping[str, Any]) -> dict[str, Any]:
@@ -58,7 +33,7 @@ class NebulaDiscoveryService:
         if self._closed:
             return
         self._closed = True
-        await self._client.aclose()
+        await self._connector.close()
 
 
 class NebulaDiscoveryServiceFactory:

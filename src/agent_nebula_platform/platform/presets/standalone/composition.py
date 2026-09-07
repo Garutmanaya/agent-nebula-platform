@@ -3,14 +3,11 @@
 from __future__ import annotations
 
 import logging
-import ssl
-
-import httpx
 from fastapi import FastAPI
 
 from agent_nebula_platform.integrations.nebula import (
     DisabledNebulaConnector,
-    RestNebulaConnector,
+    NebulaConnector,
 )
 from agent_nebula_platform.platform.context import RuntimeContext
 from agent_nebula_platform.platform.events import NullEventSink
@@ -26,7 +23,6 @@ from agent_nebula_platform.platform.presets.models import (
 )
 from agent_nebula_platform.platform.runtime import AgentRuntime
 from agent_nebula_platform.platform.state import JsonFileStateStore
-from agent_nebula_platform.platform.tls import FileTlsContextProvider
 from agent_nebula_platform.platform.transport.fastapi import runtime_lifespan
 
 from .application import StandaloneAgent
@@ -37,31 +33,20 @@ def build_standalone_agent(
     *,
     settings: StandaloneRuntimeSettings,
     components: RuntimeFeatureComponents,
+    nebula_connector: NebulaConnector | None = None,
 ) -> StandaloneAgent:
     """Build a complete opt-in agent process using built-in infrastructure.
 
-    The preset owns only the HTTP client, connector, state store, FastAPI app,
-    and Uvicorn process it creates. Business handlers, authoritative documents,
-    credentials, and SDK-composed OAuth services remain caller supplied.
+    The preset owns the state store, FastAPI app, and Uvicorn process it creates.
+    Optional Agent Nebula transport is supplied through the connector contract;
+    Registry TLS and credentials remain inside ``integrations.nebula``.
     """
 
     resolved = settings.resolve_paths()
-    nebula = resolved.nebula
-    client: httpx.AsyncClient | None = None
-    if nebula is not None:
-        tls_provider = FileTlsContextProvider(
-            ca_file=nebula.ca_file,
-            certificate_file=nebula.client_certificate_file,
-            private_key_file=nebula.client_private_key_file,
-        )
-        tls_context: ssl.SSLContext = tls_provider.create_client_context()
-        client = httpx.AsyncClient(
-            verify=tls_context,
-            timeout=httpx.Timeout(nebula.timeout_seconds),
-        )
-        connector = RestNebulaConnector(base_url=nebula.base_url, client=client)
-    else:
-        connector = DisabledNebulaConnector()
+    # Registry transport composition is owned by integrations.nebula.  The
+    # generic standalone preset consumes only the connector contract so it
+    # never needs to know how Registry TLS or credentials are represented.
+    connector = nebula_connector or DisabledNebulaConnector()
 
     if resolved.logging.console_enabled:
         level = getattr(logging, resolved.logging.level)
@@ -78,8 +63,8 @@ def build_standalone_agent(
         events=events,
     )
     resources = ManagedResourcesPlugin(
-        (ManagedResource(name="httpx.nebula", close=client.aclose),)
-        if client is not None
+        (ManagedResource(name="nebula.connector", close=connector.close),)
+        if nebula_connector is not None
         else ()
     )
 

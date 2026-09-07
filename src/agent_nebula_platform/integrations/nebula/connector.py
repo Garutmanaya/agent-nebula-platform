@@ -46,10 +46,11 @@ class RestNebulaConnector:
         resolution_endpoint: str = "/api/v1/onboarding/registrations/resolve",
         discovery_endpoint: str = "/api/v1/discovery/agents",
         lifecycle_prefix: str = "/api/v1/lifecycle/agents",
+        owns_client: bool | None = None,
     ) -> None:
         self._base = base_url.rstrip("/") + "/"
         self._client = client or httpx.AsyncClient()
-        self._owns = client is None
+        self._owns = client is None if owns_client is None else owns_client
         self._onboarding = onboarding_endpoint
         self._resolution = resolution_endpoint
         self._discovery = discovery_endpoint

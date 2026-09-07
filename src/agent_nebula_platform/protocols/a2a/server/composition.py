@@ -10,6 +10,7 @@ from a2a.server.request_handlers import DefaultRequestHandler
 from a2a.server.tasks import InMemoryTaskStore
 
 from agent_nebula_platform.integrations.nebula.configuration import NebulaConfiguration
+from agent_nebula_platform.integrations.nebula.transport import NebulaConnectorFactory
 from agent_nebula_platform.integrations.nebula.onboarding import (
     OnboardingSettings,
     build_agent_onboarding_payload,
@@ -203,7 +204,14 @@ class A2AStandaloneApplicationComposer:
             a2a_request_handler=handler,
             a2a_server_tls=listener.tls,
         )
-        standalone = build_standalone_agent(settings=settings, components=components)
+        nebula_connector = (
+            NebulaConnectorFactory.create(nebula) if nebula is not None else None
+        )
+        standalone = build_standalone_agent(
+            settings=settings,
+            components=components,
+            nebula_connector=nebula_connector,
+        )
         return A2AStandaloneApplication(
             application=standalone,
             protected_resource=protected_resource,
