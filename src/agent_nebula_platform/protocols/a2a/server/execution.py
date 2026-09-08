@@ -6,14 +6,17 @@ import inspect
 from collections.abc import Awaitable, Callable, Mapping
 from typing import Protocol
 
-from a2a.helpers import get_message_text, new_text_message
+from a2a.helpers import get_message_text
 from a2a.server.agent_execution import AgentExecutor, RequestContext
 from a2a.server.events import EventQueue
 from google.protobuf.json_format import MessageToDict
 
 from agent_nebula_platform.platform.errors import ConfigurationError
+from agent_nebula_platform.skills import SkillResult
 
-type A2ABusinessResult = Mapping[str, object]
+from .result_mapper import A2AResultMapper
+
+type A2ABusinessResult = Mapping[str, object] | SkillResult
 type A2ABusinessHandler = Callable[
     [Mapping[str, object]],
     A2ABusinessResult | Awaitable[A2ABusinessResult],
@@ -41,12 +44,18 @@ class A2AAgentExecutor(AgentExecutor):
     explicit selection. It never performs natural-language or LLM routing.
     """
 
-    def __init__(self, skills: tuple[A2AExecutableSkill, ...]) -> None:
+    def __init__(
+        self,
+        skills: tuple[A2AExecutableSkill, ...],
+        *,
+        result_mapper: A2AResultMapper | None = None,
+    ) -> None:
         """Bind executable skills by their stable advertised identifiers."""
 
         if not skills:
             raise ConfigurationError("A2A AgentExecutor requires at least one skill")
         self._skills = {skill.skill_id: skill for skill in skills}
+        self._result_mapper = result_mapper or A2AResultMapper()
         if len(self._skills) != len(skills):
             raise ConfigurationError("A2A AgentExecutor skill identifiers must be unique")
 
@@ -87,23 +96,13 @@ class A2AAgentExecutor(AgentExecutor):
         result = skill.handler(payload)
         if inspect.isawaitable(result):
             result = await result
-        if not isinstance(result, Mapping):
+        if not isinstance(result, (Mapping, SkillResult)):
             raise ConfigurationError(
-                f"A2A skill '{skill.skill_id}' must return a mapping/dict"
+                f"A2A skill '{skill.skill_id}' must return a mapping/dict or SkillResult"
             )
-        await event_queue.enqueue_event(new_text_message(self._response_text(result)))
+        await event_queue.enqueue_event(self._result_mapper.map(result))
 
     async def cancel(self, context: RequestContext, event_queue: EventQueue) -> None:
         """Acknowledge cancellation for stateless business-handler execution."""
 
         del context, event_queue
-
-    @staticmethod
-    def _response_text(result: Mapping[object, object]) -> str:
-        """Select a conventional text field while preserving arbitrary mappings."""
-
-        for key in ("message", "text"):
-            value = result.get(key)
-            if value is not None:
-                return str(value)
-        return str(dict(result))
