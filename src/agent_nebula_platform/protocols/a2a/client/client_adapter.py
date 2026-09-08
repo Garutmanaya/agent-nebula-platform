@@ -8,31 +8,18 @@ from typing import TYPE_CHECKING, Any
 from uuid import uuid4
 
 import httpx
-from a2a.client import (
-    A2ACardResolver,
-    Client,
-    ClientCallContext,
-    ClientConfig,
-    ClientFactory,
-)
-from a2a.client.service_parameters import (
-    ServiceParametersFactory,
-    with_a2a_extensions,
-)
+from a2a.client import A2ACardResolver, Client, ClientConfig, ClientFactory
 from a2a.types import AgentCard, Message, Part, Role, SendMessageRequest
 from a2a.utils.constants import TransportProtocol
 from google.protobuf.json_format import MessageToDict, ParseDict
 from google.protobuf.struct_pb2 import Value
 
 from agent_nebula_platform.platform.errors import ConfigurationError
-from agent_nebula_platform.protocols.a2a.extensions import (
-    NEBULA_SKILL_SELECTION_EXTENSION_URI,
-    build_skill_selection_metadata,
-    require_supported_skill,
-)
+from agent_nebula_platform.protocols.a2a.extensions import require_supported_skill
 from agent_nebula_platform.platform.tls import FileTlsContextProvider
 
 from .client_configuration import A2AClientConfiguration
+from .extension_context import A2AClientExtension, A2AClientExtensionContextBuilder
 from .client_security import A2AClientSecurityInterceptor
 
 if TYPE_CHECKING:
@@ -51,11 +38,13 @@ class A2AClientAdapter:
         configuration: A2AClientConfiguration,
         *,
         security_interceptor: A2AClientSecurityInterceptor | None = None,
+        extensions: tuple[A2AClientExtension, ...] = (),
     ) -> None:
         """Create one reusable client adapter from validated Platform configuration."""
 
         self._configuration = configuration
         self._security_interceptor = security_interceptor
+        self._extension_context_builder = A2AClientExtensionContextBuilder(extensions)
         self._closed = False
 
     async def resolve_agent_card(self, base_url: str) -> AgentCard:
@@ -161,38 +150,31 @@ class A2AClientAdapter:
             parts.append(Part(text=normalized))
         if data is not None:
             parts.append(Part(data=ParseDict(dict(data), Value())))
-        # NEBULA A2A EXTENSION: the selected AgentSkill.id is request semantics,
-        # not user content. It is therefore carried in SendMessageRequest.metadata
-        # and activated using the official A2A-Extensions service parameter.
         card = await self.resolve_agent_card(base_url)
-        context = None
-        metadata = None
-        if skill_id is not None:
-            require_supported_skill(card, skill_id)
-            metadata = build_skill_selection_metadata(skill_id)
-            context = ClientCallContext(
-                state={"agent_nebula.a2a.skill_id": skill_id},
-                service_parameters=ServiceParametersFactory.create(
-                    [with_a2a_extensions([NEBULA_SKILL_SELECTION_EXTENSION_URI])]
-                ),
-            )
-
-        request_arguments: dict[str, Any] = {
-            "message": Message(
-                message_id=str(uuid4()),
-                context_id=context_id or "",
-                task_id=task_id or "",
-                role=Role.ROLE_USER,
-                parts=parts,
-            )
+        extension_context = self._extension_context_builder.build(
+            card, skill_id=skill_id
+        )
+        message_arguments: dict[str, Any] = {
+            "message_id": str(uuid4()),
+            "context_id": context_id or "",
+            "task_id": task_id or "",
+            "role": Role.ROLE_USER,
+            "parts": parts,
         }
-        if metadata is not None:
-            request_arguments["metadata"] = metadata
+        if extension_context.message_metadata is not None:
+            message_arguments["metadata"] = extension_context.message_metadata
+        request_arguments: dict[str, Any] = {
+            "message": Message(**message_arguments)
+        }
+        if extension_context.request_metadata is not None:
+            request_arguments["metadata"] = extension_context.request_metadata
         request = SendMessageRequest(**request_arguments)
         client = self.create(card, skill_id=skill_id)
         responses: list[dict[str, Any]] = []
         try:
-            async for response in client.send_message(request, context=context):
+            async for response in client.send_message(
+                request, context=extension_context.call_context
+            ):
                 responses.append(
                     MessageToDict(response, preserving_proto_field_name=True)
                 )

@@ -27,8 +27,10 @@ def ensure_a2ui_extension(
 
     catalogs = _normalize_catalog_ids(supported_catalog_ids)
     expected_params: dict[str, object] = {
-        "supportedCatalogIds": list(catalogs),
-        "acceptsInlineCatalogs": accepts_inline_catalogs,
+        A2UI_STABLE_VERSION: {
+            "supportedCatalogIds": list(catalogs),
+            "acceptsInlineCatalogs": accepts_inline_catalogs,
+        }
     }
 
     extensions = agent_card.capabilities.extensions

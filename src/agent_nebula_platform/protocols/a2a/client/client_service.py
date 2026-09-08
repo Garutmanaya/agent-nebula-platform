@@ -4,7 +4,12 @@ from __future__ import annotations
 
 from pathlib import Path
 
+from agent_nebula_platform.a2ui.configuration import A2UIConfiguration
 from agent_nebula_platform.security.oauth.client.service import OAuthClientService
+from agent_nebula_platform.protocols.a2a.extensions.a2ui import A2UIClientExtension
+from agent_nebula_platform.protocols.a2a.extensions.skill_selection import (
+    SkillSelectionClientExtension,
+)
 
 from .client_adapter import A2AClientAdapter
 from .client_configuration import A2AClientConfiguration, A2AClientConfigurationLoader
@@ -37,6 +42,7 @@ class A2AClientServiceFactory:
         *,
         oauth_service: OAuthClientService | None = None,
         resource: str | None = None,
+        a2ui_configuration: A2UIConfiguration | None = None,
     ) -> A2AClientAdapter:
         """Load ``a2aclient.conf`` and compose transport plus security negotiation.
 
@@ -51,6 +57,7 @@ class A2AClientServiceFactory:
             configuration,
             oauth_service=oauth_service,
             resource=resource,
+            a2ui_configuration=a2ui_configuration,
         )
 
     @staticmethod
@@ -59,6 +66,7 @@ class A2AClientServiceFactory:
         *,
         oauth_service: OAuthClientService | None = None,
         resource: str | None = None,
+        a2ui_configuration: A2UIConfiguration | None = None,
     ) -> A2AClientAdapter:
         """Compose one official A2A client adapter from validated settings."""
 
@@ -91,4 +99,11 @@ class A2AClientServiceFactory:
         security = A2AClientSecurityInterceptor(
             A2AClientSecurityResolver(tuple(providers))
         )
-        return A2AClientAdapter(configuration, security_interceptor=security)
+        extensions = [SkillSelectionClientExtension()]
+        if a2ui_configuration is not None:
+            extensions.append(A2UIClientExtension(a2ui_configuration))
+        return A2AClientAdapter(
+            configuration,
+            security_interceptor=security,
+            extensions=tuple(extensions),
+        )

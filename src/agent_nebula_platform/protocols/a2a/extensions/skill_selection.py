@@ -173,3 +173,28 @@ def _normalize_skill_id(skill_id: str) -> str:
     if not normalized:
         raise ConfigurationError("A2A skill_id must not be blank")
     return normalized
+
+
+class SkillSelectionClientExtension:
+    """Contribute deterministic skill selection through the shared client extension path."""
+
+    def prepare(
+        self, agent_card: AgentCard, *, skill_id: str | None
+    ) -> "A2AClientExtensionContribution":
+        from agent_nebula_platform.protocols.a2a.client.extension_context import (
+            A2AClientExtensionContribution,
+        )
+
+        if skill_id is None:
+            return A2AClientExtensionContribution()
+        require_supported_skill(agent_card, skill_id)
+        normalized = _normalize_skill_id(skill_id)
+        return A2AClientExtensionContribution(
+            extension_uris=(NEBULA_SKILL_SELECTION_EXTENSION_URI,),
+            state={"agent_nebula.a2a.skill_id": normalized},
+            request_metadata={
+                NEBULA_SKILL_SELECTION_METADATA_KEY: {
+                    NEBULA_SKILL_ID_FIELD: normalized,
+                }
+            },
+        )
