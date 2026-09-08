@@ -63,3 +63,7 @@ The A2UI model includes renderer capabilities and negotiated capabilities. Negot
 ## Plugin composition
 
 `A2UIPlugin` is enabled only when A2UI is requested and required catalog/skill components are available. A2UI session support is a separate plugin, allowing session state to be enabled independently from basic surface support.
+
+## A2A bidirectional binding
+
+The A2A binding carries renderer-to-agent A2UI v1.0 `action` messages as `application/a2ui+json` DataParts. Renderer state requested by `sendDataModel` is carried separately as `a2uiRendererDataModel` message metadata. v1.0 correlated actions use `wantResponse` plus `actionId`; agent responses use `actionResponse`. Agent-initiated renderer RPC uses `callFunction`, with renderer replies using `functionResponse`.

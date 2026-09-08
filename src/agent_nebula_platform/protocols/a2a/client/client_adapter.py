@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from collections.abc import Callable, Mapping
 from pathlib import Path
+from datetime import datetime, timezone
 from typing import TYPE_CHECKING, Any
 from uuid import uuid4
 
@@ -12,9 +13,12 @@ from a2a.client import A2ACardResolver, Client, ClientConfig, ClientFactory
 from a2a.types import AgentCard, Message, Part, Role, SendMessageRequest
 from a2a.utils.constants import TransportProtocol
 from google.protobuf.json_format import MessageToDict, ParseDict
-from google.protobuf.struct_pb2 import Value
+from google.protobuf.struct_pb2 import Struct, Value
 
+from agent_nebula_platform.a2ui.models import A2UIActionRequest, A2UI_STABLE_VERSION
 from agent_nebula_platform.platform.errors import ConfigurationError
+from agent_nebula_platform.protocols.a2a.extensions.a2ui.extension import A2UI_EXTENSION_URI
+from agent_nebula_platform.protocols.a2a.extensions.a2ui.parts import create_a2ui_action_part
 from agent_nebula_platform.protocols.a2a.extensions import require_supported_skill
 from agent_nebula_platform.platform.tls import FileTlsContextProvider
 
@@ -178,6 +182,75 @@ class A2AClientAdapter:
                 responses.append(
                     MessageToDict(response, preserving_proto_field_name=True)
                 )
+        finally:
+            await client.close()
+        return tuple(responses)
+
+    async def send_a2ui_action(
+        self,
+        base_url: str,
+        *,
+        name: str,
+        surface_id: str,
+        source_component_id: str,
+        context: Mapping[str, Any] | None = None,
+        data_model: Mapping[str, Any] | None = None,
+        want_response: bool = False,
+        action_id: str | None = None,
+        context_id: str | None = None,
+        task_id: str | None = None,
+        skill_id: str | None = None,
+    ) -> tuple[dict[str, Any], ...]:
+        """Send one A2UI v1.0 renderer action over the standard A2A binding."""
+
+        card = await self.resolve_agent_card(base_url)
+        if not any(
+            extension.uri == A2UI_EXTENSION_URI
+            for extension in card.capabilities.extensions
+        ):
+            raise ConfigurationError("Remote A2A agent does not advertise A2UI v1.0")
+        extension_context = self._extension_context_builder.build(card, skill_id=skill_id)
+        action = A2UIActionRequest(
+            version=A2UI_STABLE_VERSION,
+            name=name,
+            surface_id=surface_id,
+            source_component_id=source_component_id,
+            timestamp=datetime.now(timezone.utc),
+            context=dict(context or {}),
+            want_response=want_response,
+            action_id=action_id,
+        )
+        message_metadata = (
+            MessageToDict(extension_context.message_metadata, preserving_proto_field_name=True)
+            if extension_context.message_metadata is not None
+            else {}
+        )
+        if data_model is not None:
+            message_metadata["a2uiRendererDataModel"] = {
+                "version": A2UI_STABLE_VERSION,
+                "surfaces": {surface_id: dict(data_model)},
+            }
+        message_arguments: dict[str, Any] = {
+            "message_id": str(uuid4()),
+            "context_id": context_id or "",
+            "task_id": task_id or "",
+            "role": Role.ROLE_USER,
+            "parts": [create_a2ui_action_part(action)],
+            "extensions": [A2UI_EXTENSION_URI],
+        }
+        if message_metadata:
+            message_arguments["metadata"] = ParseDict(message_metadata, Struct())
+        request_arguments: dict[str, Any] = {"message": Message(**message_arguments)}
+        if extension_context.request_metadata is not None:
+            request_arguments["metadata"] = extension_context.request_metadata
+        request = SendMessageRequest(**request_arguments)
+        client = self.create(card, skill_id=skill_id)
+        responses: list[dict[str, Any]] = []
+        try:
+            async for response in client.send_message(
+                request, context=extension_context.call_context
+            ):
+                responses.append(MessageToDict(response, preserving_proto_field_name=True))
         finally:
             await client.close()
         return tuple(responses)

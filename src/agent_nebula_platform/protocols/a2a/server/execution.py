@@ -12,6 +12,8 @@ from a2a.server.events import EventQueue
 from google.protobuf.json_format import MessageToDict
 
 from agent_nebula_platform.platform.errors import ConfigurationError
+from agent_nebula_platform.a2ui.models import A2UIActionRequest
+from agent_nebula_platform.protocols.a2a.extensions.a2ui.parts import parse_a2ui_action_part
 from agent_nebula_platform.skills import SkillResult
 
 from .result_mapper import A2AResultMapper
@@ -66,11 +68,33 @@ class A2AAgentExecutor(AgentExecutor):
         text = get_message_text(message, delimiter=" ") if message is not None else ""
         payload: dict[str, object] = {"message": text}
         if message is not None:
+            a2ui_action: A2UIActionRequest | None = None
             for part in message.parts:
+                parsed_action = parse_a2ui_action_part(part)
+                if parsed_action is not None:
+                    if a2ui_action is not None:
+                        raise ConfigurationError("A2A message may contain only one A2UI action")
+                    a2ui_action = parsed_action
+                    continue
                 if part.HasField("data"):
                     data = MessageToDict(part.data)
                     if isinstance(data, dict):
                         payload.update(data)
+            if a2ui_action is not None:
+                payload["a2ui_action"] = {
+                    "version": a2ui_action.version,
+                    "name": a2ui_action.name,
+                    "surface_id": a2ui_action.surface_id,
+                    "source_component_id": a2ui_action.source_component_id,
+                    "timestamp": a2ui_action.timestamp.isoformat(),
+                    "context": dict(a2ui_action.context),
+                    "want_response": a2ui_action.want_response,
+                    "action_id": a2ui_action.action_id,
+                }
+                metadata = MessageToDict(message.metadata) if message.HasField("metadata") else {}
+                renderer_model = metadata.get("a2uiRendererDataModel")
+                if isinstance(renderer_model, dict):
+                    payload["a2ui_renderer_data_model"] = renderer_model
         # NEBULA A2A EXTENSION: selection is made by the client and carried in
         # standards-compliant SendMessageRequest.metadata. For a single-skill
         # provider the extension remains optional for generic A2A interoperability.

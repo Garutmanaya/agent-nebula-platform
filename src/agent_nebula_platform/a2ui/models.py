@@ -21,8 +21,8 @@ _AGENT_MESSAGE_KEYS = frozenset(
         "updateComponents",
         "updateDataModel",
         "deleteSurface",
-        "callRendererFunction",
-        "agentFunctionResponse",
+        "actionResponse",
+        "callFunction",
     }
 )
 
@@ -50,11 +50,21 @@ class A2UIMessage(BaseModel):
         message_keys = _AGENT_MESSAGE_KEYS.intersection(value)
         if len(message_keys) != 1:
             raise ValueError("A2UI message must contain exactly one agent message type")
-        unexpected = set(value) - {"version"} - message_keys
+        allowed_envelope_fields = {"version"}
+        message_type = next(iter(message_keys))
+        if message_type == "actionResponse":
+            allowed_envelope_fields.add("actionId")
+        elif message_type == "callFunction":
+            allowed_envelope_fields.update({"functionCallId", "wantResponse"})
+        unexpected = set(value) - allowed_envelope_fields - message_keys
         if unexpected:
             raise ValueError(
                 f"A2UI message contains unsupported top-level fields: {sorted(unexpected)}"
             )
+        if message_type == "actionResponse" and not value.get("actionId"):
+            raise ValueError("A2UI v1.0 actionResponse requires actionId")
+        if message_type == "callFunction" and not value.get("functionCallId"):
+            raise ValueError("A2UI v1.0 callFunction requires functionCallId")
         return dict(value)
 
     @property
@@ -115,10 +125,22 @@ class A2UIActionRequest(BaseModel):
     version: str = Field(default=A2UI_STABLE_VERSION, min_length=1, max_length=40)
     name: str = Field(min_length=1, max_length=200)
     surface_id: str = Field(min_length=1, max_length=200)
-    source_component_id: str | None = Field(default=None, max_length=200)
-    timestamp: datetime | None = None
+    source_component_id: str = Field(min_length=1, max_length=200)
+    timestamp: datetime
     context: dict[str, Any] = Field(default_factory=dict)
+    want_response: bool = False
+    action_id: str | None = Field(default=None, min_length=1, max_length=200)
+    # Transport-neutral copy of renderer state. A2A carries this separately in
+    # a2uiRendererDataModel metadata; it is never serialized inside ``action``.
     data_model: dict[str, Any] = Field(default_factory=dict)
+
+    @model_validator(mode="after")
+    def validate_response_contract(self) -> A2UIActionRequest:
+        """Require the v1.0 action correlation id when a response is requested."""
+
+        if self.want_response and self.action_id is None:
+            raise ValueError("A2UI v1.0 actionId is required when wantResponse is true")
+        return self
 
 
 class A2UIActionBinding(BaseModel):
