@@ -9,6 +9,7 @@ from __future__ import annotations
 from typing import Any
 
 from .actions import A2UIActionDispatcher
+from .configuration import A2UIConfiguration
 from .data_model import A2UIDataModelService
 from .events import A2UISessionEvent
 from .models import (
@@ -48,6 +49,7 @@ __all__ = [
     "A2UIActionRequest",
     "A2UICapabilities",
     "A2UIComponentPolicy",
+    "A2UIConfiguration",
     "A2UIDataModelService",
     "A2UIDataPart",
     "A2UIMessage",

@@ -9,6 +9,7 @@ from urllib.parse import urlsplit, urlunsplit
 from a2a.server.request_handlers import DefaultRequestHandler
 from a2a.server.tasks import InMemoryTaskStore
 
+from agent_nebula_platform.a2ui.configuration import A2UIConfiguration
 from agent_nebula_platform.integrations.nebula.configuration import NebulaConfiguration
 from agent_nebula_platform.integrations.nebula.transport import NebulaConnectorFactory
 from agent_nebula_platform.integrations.nebula.onboarding import (
@@ -35,6 +36,7 @@ from agent_nebula_platform.platform.presets.standalone.application import (
 from agent_nebula_platform.platform.presets.standalone.settings import (
     StandaloneServerSettings,
 )
+from agent_nebula_platform.protocols.a2a.extensions.a2ui import ensure_a2ui_extension
 from agent_nebula_platform.protocols.a2a.extensions import (
     ensure_skill_selection_extension,
     validate_executable_skills,
@@ -114,6 +116,7 @@ class A2AStandaloneApplicationComposer:
         skill: A2AExecutableSkill | None = None,
         skills: tuple[A2AExecutableSkill, ...] = (),
         nebula_config: Path | None = None,
+        a2ui: A2UIConfiguration | None = None,
     ) -> A2AStandaloneApplication:
         """Build a standalone A2A application without developer-facade logic."""
 
@@ -132,6 +135,16 @@ class A2AStandaloneApplicationComposer:
         ensure_skill_selection_extension(
             card, required=len(executable_skills) > 1
         )
+
+        # A2UI is configured independently from A2A. The composer receives an
+        # explicit A2UI configuration location and delegates only Agent Card
+        # representation to the A2UI/A2A extension adapter.
+        if a2ui is not None and a2ui.enabled:
+            ensure_a2ui_extension(
+                card,
+                supported_catalog_ids=a2ui.supported_catalog_ids,
+                accepts_inline_catalogs=a2ui.accepts_inline_catalogs,
+            )
 
         listener = A2AListenerConfigurationLoader().load(server_config)
         handler = DefaultRequestHandler(

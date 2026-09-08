@@ -1,0 +1,8 @@
+# Independent A2UI protocol configuration.
+# This file is intentionally separate from a2aserver.conf.
+[a2ui]
+enabled = true
+version = v1.0
+# Comma-separated A2UI catalog identifiers advertised through AgentExtension.params.
+supported_catalog_ids =
+accepts_inline_catalogs = false
