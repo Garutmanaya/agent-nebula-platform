@@ -171,13 +171,20 @@ class A2UIComponentPolicy:
             elif deleted:
                 raise ConfigurationError("A2UI messages cannot follow surface deletion")
 
-            if message.message_type == "updateComponents":
-                ids, refs, actions = self._validate_components(
-                    payload.get("components")
-                )
-                component_ids.update(ids)
-                references.update(refs)
-                action_names.update(actions)
+            # A2UI v1.0 permits the initial component tree to be embedded in
+            # createSurface.  Validate it through the same catalog/security
+            # policy as subsequent updateComponents messages.
+            if message.message_type in {"createSurface", "updateComponents"}:
+                components = payload.get("components")
+                if components is not None:
+                    ids, refs, actions = self._validate_components(components)
+                    component_ids.update(ids)
+                    references.update(refs)
+                    action_names.update(actions)
+                elif message.message_type == "updateComponents":
+                    raise ConfigurationError(
+                        "A2UI updateComponents requires a component list"
+                    )
 
         if not created:
             raise ConfigurationError("A2UI surface is missing createSurface")
@@ -256,8 +263,14 @@ class A2UIComponentPolicy:
                         raise ConfigurationError(
                             f"A2UI renderer function is not approved by policy: {call}"
                         )
-                action_name = action.get("name")
-                if action_name is not None:
+                # A2UI v1.0 represents user events as action.event.  Keep
+                # functionCall validation independent because catalog-defined
+                # renderer functions are not action events.
+                event = action.get("event")
+                if event is not None:
+                    if not isinstance(event, Mapping):
+                        raise ConfigurationError("A2UI action event must be an object")
+                    action_name = event.get("name")
                     if not isinstance(action_name, str) or not action_name:
                         raise ConfigurationError("A2UI action name must be non-empty")
                     action_names.add(action_name)

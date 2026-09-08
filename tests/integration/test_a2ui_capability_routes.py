@@ -70,14 +70,14 @@ def test_a2ui_capability_and_negotiation_routes() -> None:
         negotiated = client.post(
             "/api/v1/a2ui/negotiate",
             json={
-                "supported_versions": ["v0.9.1"],
+                "supported_versions": ["v1.0"],
                 "supported_components": ["Button"],
                 "supported_functions": [],
             },
         )
 
     assert capabilities.status_code == 200
-    assert capabilities.json()["preferred_version"] == "v0.9.1"
+    assert capabilities.json()["preferred_version"] == "v1.0"
     assert capabilities.json()["action_names"] == ["submit"]
     assert negotiated.status_code == 200
     assert negotiated.json()["components"] == ["Button"]

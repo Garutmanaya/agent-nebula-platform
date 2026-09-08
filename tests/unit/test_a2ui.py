@@ -27,7 +27,7 @@ def _surface(*, component: str = "Text") -> A2UISurface:
         messages=(
             A2UIMessage(
                 document={
-                    "version": "v0.9.1",
+                    "version": "v1.0",
                     "createSurface": {
                         "surfaceId": "main",
                         "catalogId": "urn:agent-nebula:a2ui:basic",
@@ -36,7 +36,7 @@ def _surface(*, component: str = "Text") -> A2UISurface:
             ),
             A2UIMessage(
                 document={
-                    "version": "v0.9.1",
+                    "version": "v1.0",
                     "updateComponents": {
                         "surfaceId": "main",
                         "components": [
@@ -71,7 +71,7 @@ def test_surface_rejects_unapproved_component_and_executable_content() -> None:
         messages=(
             A2UIMessage(
                 document={
-                    "version": "v0.9.1",
+                    "version": "v1.0",
                     "createSurface": {
                         "surfaceId": "main",
                         "catalogId": "urn:test",

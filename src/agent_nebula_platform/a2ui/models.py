@@ -13,10 +13,17 @@ from typing import Any, Literal
 from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 
 A2UI_MIME_TYPE = "application/a2ui+json"
-A2UI_STABLE_VERSION = "v0.9.1"
+A2UI_STABLE_VERSION = "v1.0"
 A2UI_SUPPORTED_VERSIONS = (A2UI_STABLE_VERSION,)
 _AGENT_MESSAGE_KEYS = frozenset(
-    {"createSurface", "updateComponents", "updateDataModel", "deleteSurface"}
+    {
+        "createSurface",
+        "updateComponents",
+        "updateDataModel",
+        "deleteSurface",
+        "callRendererFunction",
+        "agentFunctionResponse",
+    }
 )
 
 
@@ -43,6 +50,11 @@ class A2UIMessage(BaseModel):
         message_keys = _AGENT_MESSAGE_KEYS.intersection(value)
         if len(message_keys) != 1:
             raise ValueError("A2UI message must contain exactly one agent message type")
+        unexpected = set(value) - {"version"} - message_keys
+        if unexpected:
+            raise ValueError(
+                f"A2UI message contains unsupported top-level fields: {sorted(unexpected)}"
+            )
         return dict(value)
 
     @property

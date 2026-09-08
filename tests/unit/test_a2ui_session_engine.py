@@ -23,7 +23,7 @@ async def test_session_engine_manages_navigation_data_actions_and_participants()
         events=NullEventSink(),
         max_history=10,
     )
-    session = await service.create(renderer={"supported_versions": ["v0.9.1"]})
+    session = await service.create(renderer={"supported_versions": ["v1.0"]})
     session = await service.select_agent(session.session_id, "parking-agent")
     session = await service.apply_surface(
         session.session_id,
@@ -32,7 +32,7 @@ async def test_session_engine_manages_navigation_data_actions_and_participants()
             owner_agent_id="parking-agent",
             skill_id="parking.search",
             messages=(
-                {"version": "v0.9.1", "createSurface": {"surfaceId": "search-results"}},
+                {"version": "v1.0", "createSurface": {"surfaceId": "search-results"}},
             ),
         ),
     )
@@ -122,7 +122,7 @@ async def test_json_session_store_survives_service_recreation(tmp_path) -> None:
         store=JsonFileA2UISessionStore(tmp_path),
         events=NullEventSink(),
     )
-    session = await first.create(renderer={"supported_versions": ["v0.9.1"]})
+    session = await first.create(renderer={"supported_versions": ["v1.0"]})
     session = await first.select_agent(session.session_id, "finance-agent")
     session = await first.apply_surface(
         session.session_id,

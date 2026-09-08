@@ -25,7 +25,7 @@ from agent_nebula_platform.skills import (
 
 def _surface(
     *,
-    version: str = "v0.9.1",
+    version: str = "v1.0",
     catalog_id: str = "urn:agent-nebula:a2ui:test",
     components: list[dict[str, object]] | None = None,
 ) -> A2UISurface:
@@ -59,7 +59,7 @@ def _surface(
                                 "id": "submit",
                                 "component": "Button",
                                 "text": "Submit",
-                                "action": {"name": "submit"},
+                                "action": {"event": {"name": "submit"}},
                             },
                         ],
                     },
@@ -80,8 +80,8 @@ def _service() -> A2UIService:
             allowed_components=("Column", "Button"),
         ),
         protocol_policy=A2UIProtocolPolicy(
-            supported_versions=("v0.9.1",),
-            preferred_version="v0.9.1",
+            supported_versions=("v1.0",),
+            preferred_version="v1.0",
             allowed_catalog_ids=("urn:agent-nebula:a2ui:test",),
         ),
         invocation_service=SkillInvocationService(
@@ -103,15 +103,15 @@ def test_capabilities_and_negotiation_are_explicit() -> None:
     capabilities = service.capabilities()
     negotiated = service.negotiate(
         A2UIRendererCapabilities(
-            supported_versions=("v1.0", "v0.9.1"),
+            supported_versions=("v1.0",),
             supported_components=("Button", "Text"),
             supported_functions=(),
         )
     )
 
-    assert capabilities.preferred_version == "v0.9.1"
+    assert capabilities.preferred_version == "v1.0"
     assert capabilities.action_names == ("submit",)
-    assert negotiated.version == "v0.9.1"
+    assert negotiated.version == "v1.0"
     assert negotiated.components == ("Button",)
 
 
@@ -134,7 +134,7 @@ def test_surface_rejects_mixed_versions_and_unapproved_catalog() -> None:
         messages=(
             A2UIMessage(
                 document={
-                    "version": "v0.9.1",
+                    "version": "v1.0",
                     "createSurface": {
                         "surfaceId": "main",
                         "catalogId": "urn:agent-nebula:a2ui:test",
@@ -143,7 +143,7 @@ def test_surface_rejects_mixed_versions_and_unapproved_catalog() -> None:
             ),
             A2UIMessage(
                 document={
-                    "version": "v1.0",
+                    "version": "v0.9.1",
                     "deleteSurface": {"surfaceId": "main"},
                 }
             ),
@@ -182,7 +182,7 @@ def test_surface_rejects_unregistered_action_names() -> None:
             {
                 "id": "root",
                 "component": "Button",
-                "action": {"name": "delete_everything"},
+                "action": {"event": {"name": "delete_everything"}},
             }
         ]
     )
@@ -206,4 +206,74 @@ async def test_action_version_is_validated_before_skill_dispatch() -> None:
             dpop_proof=None,
             http_method="POST",
             target_uri="https://agent.example/api/v1/a2ui/actions",
+        )
+
+
+def test_v1_create_surface_validates_embedded_components_and_actions() -> None:
+    """v1.0 single-message surfaces use the same component/action policy."""
+
+    surface = A2UISurface(
+        surface_id="main",
+        messages=(
+            A2UIMessage(
+                document={
+                    "version": "v1.0",
+                    "createSurface": {
+                        "surfaceId": "main",
+                        "catalogId": "urn:agent-nebula:a2ui:test",
+                        "components": [
+                            {
+                                "id": "root",
+                                "component": "Button",
+                                "action": {"event": {"name": "submit"}},
+                            }
+                        ],
+                        "dataModel": {"ready": True},
+                    },
+                }
+            ),
+        ),
+    )
+
+    data_part = _service().data_part(surface)
+
+    assert data_part.data[0]["createSurface"]["dataModel"] == {"ready": True}
+
+
+def test_v1_agent_rpc_envelopes_are_preserved() -> None:
+    """v1.0 agent RPC messages remain opaque until the RPC layer owns them."""
+
+    call = A2UIMessage(
+        document={
+            "version": "v1.0",
+            "callRendererFunction": {
+                "functionCallId": "call-1",
+                "callFunction": {"call": "clipboard.copy", "args": {}},
+            },
+        }
+    )
+    response = A2UIMessage(
+        document={
+            "version": "v1.0",
+            "agentFunctionResponse": {
+                "functionCallId": "call-2",
+                "value": {"ok": True},
+            },
+        }
+    )
+
+    assert call.message_type == "callRendererFunction"
+    assert response.message_type == "agentFunctionResponse"
+
+
+def test_v1_agent_message_rejects_unknown_top_level_fields() -> None:
+    """v1.0 envelopes contain only version and one defined message type."""
+
+    with pytest.raises(ValueError, match="unsupported top-level fields"):
+        A2UIMessage(
+            document={
+                "version": "v1.0",
+                "createSurface": {"surfaceId": "main"},
+                "legacyExtension": {},
+            }
         )
