@@ -26,12 +26,12 @@ def build_agent_onboarding_payload(
     capabilities: tuple[str, ...],
     authentication_method: str = "OPEN",
 ) -> dict[str, Any]:
-    """Build protocol-neutral Agent-only onboarding without OAuth resource roles."""
+    """Build A2A provider onboarding without OAuth resource roles."""
 
     method = OnboardingAuthenticationMethod(authentication_method)
     request = OnboardingRequest(
         entity_name=entity_name,
-        roles=frozenset(),
+        roles=frozenset((AgentRole.A2A_PROVIDER,)),
         authentication=OnboardingAuthenticationInput(
             method=method,
             credential=(
@@ -65,7 +65,7 @@ def build_provider_onboarding_payload(
     method = OnboardingAuthenticationMethod(authentication_method)
     request = OnboardingRequest(
         entity_name=entity_name,
-        roles=frozenset((AgentRole.OAUTH_PROTECTED_RESOURCE,)),
+        roles=frozenset((AgentRole.A2A_PROVIDER, AgentRole.OAUTH_PROTECTED_RESOURCE)),
         authentication=OnboardingAuthenticationInput(
             method=method,
             credential=(

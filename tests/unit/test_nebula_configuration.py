@@ -21,13 +21,13 @@ def test_nebula_conf_open_full_verify(tmp_path: Path) -> None:
     assert settings.tls.ca_file == (tmp_path / "ca.pem").resolve()
 
 
-def test_agent_only_onboarding_has_no_oauth_role_or_resource() -> None:
+def test_agent_only_onboarding_has_a2a_provider_role_without_oauth_resource() -> None:
     payload = build_agent_onboarding_payload(
         entity_name="Echo",
         agent_card_uri="https://echo.example/.well-known/agent-card.json",
         protocols=("A2A",),
         capabilities=("echo",),
     )
-    assert payload["roles"] == []
+    assert payload["roles"] == ["A2A_PROVIDER"]
     assert payload["authentication"] == {"method": "OPEN"}
     assert "protected_resource" not in payload
