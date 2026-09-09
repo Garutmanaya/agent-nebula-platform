@@ -120,11 +120,16 @@ class A2AClientConfigurationLoader:
             raise ConfigurationError(
                 "A2A client TLS certificate_file and private_key_file must be configured together"
             )
-        if not tls_enabled and any(
-            item is not None for item in (trust_bundle, certificate_file, private_key_file)
-        ):
+        # A trust bundle controls certificate verification for outbound HTTPS
+        # (Agent Card, OAuth metadata/token endpoints, and HTTP A2A bindings)
+        # even when explicit client TLS/mTLS mode is disabled.  Requiring
+        # ``enabled = true`` for a CA bundle made ordinary HTTPS callers either
+        # reject valid private PKI configuration or fall back to disabled
+        # verification.  Client certificate material remains explicit mTLS
+        # configuration and therefore still requires TLS mode to be enabled.
+        if not tls_enabled and (certificate_file is not None or private_key_file is not None):
             raise ConfigurationError(
-                "A2A client TLS material requires [client.tls].enabled = true"
+                "A2A client certificate material requires [client.tls].enabled = true"
             )
 
         credentials_table = client.get("credentials", {})

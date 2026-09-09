@@ -56,10 +56,24 @@ def test_server_tls_requires_certificate_and_key_when_enabled(tmp_path: Path) ->
         A2AListenerConfigurationLoader().load(path)
 
 
-def test_server_tls_rejects_material_when_disabled(tmp_path: Path) -> None:
+def test_server_tls_allows_trust_bundle_when_disabled(tmp_path: Path) -> None:
     path = tmp_path / "a2aserver.conf"
     path.write_text(
         "[server]\n[server.tls]\nenabled=false\ntrust_bundle='ca.pem'\n",
+        encoding="utf-8",
+    )
+
+    listener = A2AListenerConfigurationLoader().load(path)
+
+    assert listener.tls.enabled is False
+    assert listener.tls.trust_bundle == (tmp_path / "ca.pem").resolve()
+
+
+def test_server_tls_rejects_certificate_material_when_disabled(tmp_path: Path) -> None:
+    path = tmp_path / "a2aserver.conf"
+    path.write_text(
+        "[server]\n[server.tls]\nenabled=false\n"
+        "certificate_file='server.crt'\nprivate_key_file='server.key'\n",
         encoding="utf-8",
     )
 

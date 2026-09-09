@@ -29,7 +29,7 @@ class TestA2AClientConfigurationLoader:
 
         assert configuration.supported_protocol_bindings == ("JSONRPC", "HTTP+JSON")
         assert configuration.use_client_preference is False
-        assert configuration.tls.enabled is True
+        assert configuration.tls.enabled is False
         assert configuration.tls.trust_bundle == trust.resolve()
 
     def test_rejects_unknown_transport(self, tmp_path: Path) -> None:

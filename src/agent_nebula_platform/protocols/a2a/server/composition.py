@@ -15,6 +15,7 @@ from agent_nebula_platform.integrations.nebula.transport import NebulaConnectorF
 from agent_nebula_platform.integrations.nebula.onboarding import (
     OnboardingSettings,
     build_agent_onboarding_payload,
+    build_provider_onboarding_payload,
 )
 from agent_nebula_platform.platform.configuration.application import (
     PlatformApplicationConfigurationLoader,
@@ -162,6 +163,7 @@ class A2AStandaloneApplicationComposer:
             agent_name=card.name,
             interface_url=str(card.supported_interfaces[0].url),
             capabilities=tuple(published.id for published in card.skills),
+            protected_resource=protected_resource,
         )
         application = PlatformApplicationConfigurationLoader().load(application_config)
         settings = StandaloneRuntimeSettings(
@@ -195,7 +197,7 @@ class A2AStandaloneApplicationComposer:
                 oauth_client=False,
                 protected_resource=protected_resource is not None,
                 skills=False,
-                protected_resource_metadata=False,
+                protected_resource_metadata=protected_resource is not None,
                 health=True,
                 rest=False,
                 a2a=True,
@@ -212,6 +214,9 @@ class A2AStandaloneApplicationComposer:
             onboarding_payload_provider=payload_provider,
             protected_resource=(
                 protected_resource.runtime.service if protected_resource else None
+            ),
+            protected_resource_metadata=(
+                protected_resource.metadata if protected_resource else None
             ),
             a2a_agent_card=card,
             a2a_request_handler=handler,
@@ -237,6 +242,7 @@ class A2AStandaloneApplicationComposer:
         agent_name: str,
         interface_url: str,
         capabilities: tuple[str, ...],
+        protected_resource: A2AProtectedResourceComposition | None,
     ) -> tuple[
         StandaloneNebulaSettings | None,
         OnboardingSettings | None,
@@ -261,13 +267,39 @@ class A2AStandaloneApplicationComposer:
             retry_delay_seconds=registration.retry_delay_seconds,
             resolve_before_register=registration.resolve_before_register,
         )
-        payload = build_agent_onboarding_payload(
-            entity_name=agent_name,
-            agent_card_uri=A2AStandaloneApplicationComposer._agent_card_uri(interface_url),
-            protocols=("A2A",),
-            capabilities=capabilities,
-            authentication_method=registration.authentication.value,
-        )
+        agent_card_uri = A2AStandaloneApplicationComposer._agent_card_uri(interface_url)
+        if protected_resource is None:
+            payload = build_agent_onboarding_payload(
+                entity_name=agent_name,
+                agent_card_uri=agent_card_uri,
+                protocols=("A2A",),
+                capabilities=capabilities,
+                authentication_method=registration.authentication.value,
+            )
+        else:
+            # OAuth protection is described using RFC 9728 and registered as a
+            # separate onboarding concern.  We deliberately do not modify the
+            # official A2A 1.0 Agent Card or the A2UI 1.0 extension to carry
+            # Agent Nebula Registry data.  The document comes from the same
+            # protected-resource composition that enforces OAuth at runtime.
+            protected_resource_document = (
+                protected_resource.metadata
+                .get_protected_resource_metadata()
+                .copy_document()
+            )
+            payload = build_provider_onboarding_payload(
+                entity_name=agent_name,
+                agent_card_uri=agent_card_uri,
+                protected_resource_metadata_uri=(
+                    A2AStandaloneApplicationComposer._protected_resource_metadata_uri(
+                        interface_url
+                    )
+                ),
+                protected_resource_document=protected_resource_document,
+                protocols=("A2A",),
+                capabilities=capabilities,
+                authentication_method=registration.authentication.value,
+            )
 
         def payload_provider() -> dict:
             """Return the immutable registration payload for Runtime onboarding."""
@@ -277,10 +309,25 @@ class A2AStandaloneApplicationComposer:
         return settings, onboarding, payload_provider
 
     @staticmethod
+    def _protected_resource_metadata_uri(interface_url: str) -> str:
+        """Derive the RFC 9728 metadata URI from the public A2A interface.
+
+        Reverse-proxy path prefixes are part of the public resource namespace
+        and must be preserved, exactly as they are for the Agent Card URI.
+        """
+
+        parsed = urlsplit(interface_url)
+        public_path = parsed.path.rstrip("/")
+        metadata_path = f"{public_path}/.well-known/oauth-protected-resource"
+        return urlunsplit((parsed.scheme, parsed.netloc, metadata_path, "", ""))
+
+    @staticmethod
     def _agent_card_uri(interface_url: str) -> str:
         """Derive the standard public Agent Card URI from an A2A interface URL."""
 
         parsed = urlsplit(interface_url)
+        public_path = parsed.path.rstrip("/")
+        agent_card_path = f"{public_path}/.well-known/agent-card.json"
         return urlunsplit(
-            (parsed.scheme, parsed.netloc, "/.well-known/agent-card.json", "", "")
+            (parsed.scheme, parsed.netloc, agent_card_path, "", "")
         )

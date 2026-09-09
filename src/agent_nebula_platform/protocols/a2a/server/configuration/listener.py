@@ -79,11 +79,12 @@ class A2AListenerConfigurationLoader:
             raise ConfigurationError(
                 "TLS-enabled A2A server requires certificate_file and private_key_file"
             )
-        if not enabled and any(
-            item is not None for item in (trust_bundle, certificate, private_key)
-        ):
+        # The trust bundle is also used by the OAuth protected-resource runtime
+        # to verify Authorization Server metadata/JWKS over HTTPS.  It is
+        # therefore valid when inbound A2A TLS is terminated by a reverse proxy.
+        if not enabled and any(item is not None for item in (certificate, private_key)):
             raise ConfigurationError(
-                "A2A server TLS material requires [server.tls].enabled = true"
+                "A2A server TLS certificate material requires [server.tls].enabled = true"
             )
         return A2AListenerConfiguration(
             host=str(server.get("host", "0.0.0.0")),

@@ -11,6 +11,11 @@ from agent_nebula_sdk.oauth.rfc8414 import AuthorizationServerMetadataClient
 
 from agent_nebula_platform.platform.errors import ConfigurationError
 from agent_nebula_platform.platform.events import NullEventSink
+from agent_nebula_platform.security.oauth.metadata import (
+    AuthorizationServerMetadata,
+    ProtectedResourceMetadataFactory,
+    ProtectedResourceMetadataProvider,
+)
 from agent_nebula_platform.security.oauth.protected_resource.factory import (
     ProtectedResourceRuntime,
     ProtectedResourceRuntimeFactory,
@@ -19,9 +24,17 @@ from agent_nebula_platform.security.oauth.protected_resource.factory import (
 
 @dataclass(frozen=True, slots=True)
 class A2AProtectedResourceComposition:
-    """Own the SDK-backed protected-resource runtime created for an A2A server."""
+    """Own OAuth runtime security and its authoritative RFC 9728 metadata.
+
+    The runtime validates inbound OAuth/DPoP requests. ``metadata`` is the same
+    protected-resource description used for discovery and Agent Nebula
+    onboarding. Keeping both in one composition prevents registration metadata
+    from drifting from the resource identifier and authorization server that
+    actually protect the A2A endpoint.
+    """
 
     runtime: ProtectedResourceRuntime
+    metadata: ProtectedResourceMetadataProvider
 
 
 class A2AProtectedResourceFactory:
@@ -61,8 +74,9 @@ class A2AProtectedResourceFactory:
             raise ConfigurationError(
                 "Authorization Server metadata for A2A OAuth protection is missing jwks_uri"
             )
+        resource = str(agent_card.supported_interfaces[0].url).rstrip("/")
         protected = ProtectedResourceRuntimeFactory().build(
-            resource=str(agent_card.supported_interfaces[0].url).rstrip("/"),
+            resource=resource,
             issuer=metadata.issuer,
             jwks_uri=metadata.jwks_uri,
             ca_file=str(trust_bundle_file),
@@ -71,7 +85,47 @@ class A2AProtectedResourceFactory:
             events=NullEventSink(),
             timeout_seconds=timeout_seconds,
         )
-        return A2AProtectedResourceComposition(runtime=protected)
+        # RFC 9728 metadata is OAuth discovery metadata, not an A2A extension.
+        # Derive it from the official A2A 1.0 Agent Card security schemes and
+        # the same verified RFC 8414 document used by the runtime.  This keeps
+        # A2A and A2UI protocol models untouched while making the protected
+        # resource available to Registry onboarding and discovery.
+        protected_resource_metadata = ProtectedResourceMetadataFactory().create(
+            resource=resource,
+            resource_name=agent_card.name,
+            authorization_server=AuthorizationServerMetadata(
+                issuer=metadata.issuer,
+                jwks_uri=metadata.jwks_uri,
+                token_endpoint=metadata.token_endpoint,
+                registration_endpoint=metadata.registration_endpoint,
+            ),
+            scopes=self._oauth_scopes(agent_card),
+            dpop_algorithms=("ES256",),
+        )
+        return A2AProtectedResourceComposition(
+            runtime=protected,
+            metadata=protected_resource_metadata,
+        )
+
+    @staticmethod
+    def _oauth_scopes(agent_card: AgentCard) -> tuple[str, ...]:
+        """Return OAuth scopes advertised by official A2A 1.0 security schemes.
+
+        Scope identifiers remain owned by the Agent Card.  Platform only
+        projects those standard OAuth flow values into RFC 9728 metadata; it
+        does not add fields to the A2A Agent Card or reinterpret A2A skills.
+        """
+
+        scopes: list[str] = []
+        for scheme in agent_card.security_schemes.values():
+            if scheme.WhichOneof("scheme") != "oauth2_security_scheme":
+                continue
+            flows = scheme.oauth2_security_scheme.flows
+            for _, flow in flows.ListFields():
+                for scope in flow.scopes:
+                    if scope not in scopes:
+                        scopes.append(scope)
+        return tuple(scopes)
 
     @staticmethod
     def _oauth_metadata_urls(agent_card: AgentCard) -> set[str]:

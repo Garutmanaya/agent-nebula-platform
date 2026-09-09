@@ -270,22 +270,25 @@ class A2AClientAdapter:
         self._ensure_open()
         tls = self._configuration.tls
         context: bool | object
-        if not tls.enabled:
-            context = False
-        elif tls.trust_bundle is None:
+        # HTTPX selects TLS from the remote URL.  ``enabled`` controls explicit
+        # client TLS/mTLS material; a configured trust bundle must still verify
+        # ordinary HTTPS when mTLS is disabled.  Never translate disabled mTLS
+        # into ``verify=False`` because that silently disables server identity
+        # verification for Agent Card and A2A HTTPS requests.
+        if tls.trust_bundle is not None:
+            context = FileTlsContextProvider(
+                ca_file=tls.trust_bundle,
+                certificate_file=tls.certificate_file if tls.enabled else None,
+                private_key_file=tls.private_key_file if tls.enabled else None,
+            ).create_client_context()
+        else:
             import ssl
 
             context = ssl.create_default_context()
-            if tls.certificate_file is not None:
+            if tls.enabled and tls.certificate_file is not None:
                 context.load_cert_chain(
                     str(tls.certificate_file), str(tls.private_key_file)
                 )
-        else:
-            context = FileTlsContextProvider(
-                ca_file=tls.trust_bundle,
-                certificate_file=tls.certificate_file,
-                private_key_file=tls.private_key_file,
-            ).create_client_context()
         event_hooks = None
         if agent_card is not None and self._security_interceptor is not None:
 
