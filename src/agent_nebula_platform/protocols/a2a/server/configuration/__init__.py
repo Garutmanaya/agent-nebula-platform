@@ -3,7 +3,7 @@
 from .factory import A2AAgentCardFactory
 from .listener import A2AListenerConfiguration, A2AListenerConfigurationLoader
 from .loader import A2AServerConfigurationLoader
-from .service import A2AServerConfigurationService
+from .service import A2AServerConfiguration, A2AServerConfigurationService
 from .validation import A2AAgentCardValidator
 
 __all__ = [
@@ -12,5 +12,6 @@ __all__ = [
     "A2AListenerConfiguration",
     "A2AListenerConfigurationLoader",
     "A2AServerConfigurationLoader",
+    "A2AServerConfiguration",
     "A2AServerConfigurationService",
 ]

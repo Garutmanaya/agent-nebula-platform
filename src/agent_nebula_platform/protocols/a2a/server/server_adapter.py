@@ -32,6 +32,7 @@ class A2AServerAdapter:
         *,
         app: FastAPI,
         agent_card: AgentCard,
+        agent_card_route: str = "/.well-known/agent-card.json",
         request_handler: RequestHandler,
         planner: A2AServerInterfacePlanner | None = None,
         security: A2AServerSecurityService | None = None,
@@ -41,6 +42,7 @@ class A2AServerAdapter:
 
         self._app = app
         self._agent_card = agent_card
+        self._agent_card_route = agent_card_route
         self._request_handler = request_handler
         self._planner = planner or A2AServerInterfacePlanner()
         self._security = security
@@ -104,7 +106,9 @@ class A2AServerAdapter:
         # caller-owned FastAPI router instead of depending on the FastAPI
         # convenience helper introduced in a later SDK release.
         routes = [
-            *create_agent_card_routes(self._agent_card),
+            *create_agent_card_routes(
+                self._agent_card, card_url=self._agent_card_route
+            ),
             *jsonrpc_routes,
             *rest_routes,
         ]
@@ -119,7 +123,7 @@ class A2AServerAdapter:
         for route in routes:
             if (
                 isinstance(route, Route)
-                and route.path == "/.well-known/agent-card.json"
+                and route.path == self._agent_card_route
             ):
                 secured.append(route)
                 continue

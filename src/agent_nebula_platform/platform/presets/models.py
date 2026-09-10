@@ -82,6 +82,7 @@ class RuntimeFeatureComponents:
     oauth_client: OAuthClientService | None = None
     protected_resource: ProtectedResourceService | None = None
     a2a_agent_card: OfficialA2AAgentCard | None = None
+    a2a_agent_card_route: str = "/.well-known/agent-card.json"
     a2a_request_handler: RequestHandler | None = None
     a2a_server_tls: A2AServerTlsConfiguration | None = None
     a2a_security_authenticators: tuple[A2ASecuritySchemeAuthenticator, ...] = ()
@@ -110,6 +111,7 @@ class RuntimeFeatureComponents:
         oauth_client: OAuthClientService | None = None,
         protected_resource: ProtectedResourceService | None = None,
         a2a_agent_card: OfficialA2AAgentCard | None = None,
+        a2a_agent_card_route: str = "/.well-known/agent-card.json",
         a2a_request_handler: RequestHandler | None = None,
         a2a_server_tls: A2AServerTlsConfiguration | None = None,
         a2a_security_authenticators: Iterable[A2ASecuritySchemeAuthenticator] = (),
@@ -137,6 +139,7 @@ class RuntimeFeatureComponents:
             oauth_client=oauth_client,
             protected_resource=protected_resource,
             a2a_agent_card=a2a_agent_card,
+            a2a_agent_card_route=a2a_agent_card_route,
             a2a_request_handler=a2a_request_handler,
             a2a_server_tls=a2a_server_tls,
             a2a_security_authenticators=tuple(a2a_security_authenticators),

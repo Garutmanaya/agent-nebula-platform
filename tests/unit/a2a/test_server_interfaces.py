@@ -101,6 +101,7 @@ async def test_adapter_mounts_only_configured_http_interfaces() -> None:
                 protocol_version="1.0",
             )
         ),
+        agent_card_route="/inventory/.well-known/agent-card.json",
         request_handler=Mock(spec=RequestHandler),
     )
 
@@ -109,7 +110,7 @@ async def test_adapter_mounts_only_configured_http_interfaces() -> None:
 
     # The official 1.0.x route factories return Starlette routes. Runtime
     # mounts them directly into the existing FastAPI router.
-    assert "/.well-known/agent-card.json" in paths
+    assert "/inventory/.well-known/agent-card.json" in paths
     assert "/a2a/rpc" in paths
     assert "/a2a/rest/message:send" not in paths
     await adapter.close()

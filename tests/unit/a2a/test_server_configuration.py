@@ -22,9 +22,14 @@ class TestA2AServerConfigurationService:
         path = tmp_path / "a2aserver.conf"
         path.write_text(_VALID_CONFIGURATION, encoding="utf-8")
 
-        card = A2AServerConfigurationService().load_agent_card(path)
+        configuration = A2AServerConfigurationService().load(path)
+        card = configuration.agent_card
 
         assert isinstance(card, AgentCard)
+        assert configuration.agent_card_url == (
+            "https://inventory.example/.well-known/agent-card.json"
+        )
+        assert configuration.agent_card_route == "/.well-known/agent-card.json"
         assert card.name == "Inventory Agent"
         assert card.supported_interfaces[0].protocol_binding == "JSONRPC"
         assert (
@@ -92,6 +97,7 @@ class TestA2AServerConfigurationService:
 
 _VALID_CONFIGURATION = """
 [agent_card]
+url = "https://inventory.example/.well-known/agent-card.json"
 name = "Inventory Agent"
 description = "Inventory provider"
 version = "1.0.0"

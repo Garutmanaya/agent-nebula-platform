@@ -207,6 +207,7 @@ def compose_feature_plugins(
             A2AServerPlugin(
                 app=server.app,
                 agent_card=components.a2a_agent_card,
+                agent_card_route=components.a2a_agent_card_route,
                 request_handler=components.a2a_request_handler,
                 required=settings.a2a is True,
                 security=security,

@@ -121,7 +121,8 @@ class A2AStandaloneApplicationComposer:
     ) -> A2AStandaloneApplication:
         """Build a standalone A2A application without developer-facade logic."""
 
-        card = A2AServerConfigurationService().load_agent_card(server_config)
+        server_configuration = A2AServerConfigurationService().load(server_config)
+        card = server_configuration.agent_card
         # Backward compatibility keeps the former single ``skill`` composition
         # call valid while SecureAgent migrates to passing all registered skills.
         executable_skills = skills or ((skill,) if skill is not None else ())
@@ -162,6 +163,7 @@ class A2AStandaloneApplicationComposer:
             nebula=nebula,
             agent_name=card.name,
             interface_url=str(card.supported_interfaces[0].url),
+            agent_card_url=server_configuration.agent_card_url,
             capabilities=tuple(published.id for published in card.skills),
             protected_resource=protected_resource,
         )
@@ -219,6 +221,7 @@ class A2AStandaloneApplicationComposer:
                 protected_resource.metadata if protected_resource else None
             ),
             a2a_agent_card=card,
+            a2a_agent_card_route=server_configuration.agent_card_route,
             a2a_request_handler=handler,
             a2a_server_tls=listener.tls,
         )
@@ -241,6 +244,7 @@ class A2AStandaloneApplicationComposer:
         nebula: NebulaConfiguration | None,
         agent_name: str,
         interface_url: str,
+        agent_card_url: str,
         capabilities: tuple[str, ...],
         protected_resource: A2AProtectedResourceComposition | None,
     ) -> tuple[
@@ -267,7 +271,7 @@ class A2AStandaloneApplicationComposer:
             retry_delay_seconds=registration.retry_delay_seconds,
             resolve_before_register=registration.resolve_before_register,
         )
-        agent_card_uri = A2AStandaloneApplicationComposer._agent_card_uri(interface_url)
+        agent_card_uri = agent_card_url
         if protected_resource is None:
             payload = build_agent_onboarding_payload(
                 entity_name=agent_name,
@@ -320,14 +324,3 @@ class A2AStandaloneApplicationComposer:
         public_path = parsed.path.rstrip("/")
         metadata_path = f"{public_path}/.well-known/oauth-protected-resource"
         return urlunsplit((parsed.scheme, parsed.netloc, metadata_path, "", ""))
-
-    @staticmethod
-    def _agent_card_uri(interface_url: str) -> str:
-        """Derive the standard public Agent Card URI from an A2A interface URL."""
-
-        parsed = urlsplit(interface_url)
-        public_path = parsed.path.rstrip("/")
-        agent_card_path = f"{public_path}/.well-known/agent-card.json"
-        return urlunsplit(
-            (parsed.scheme, parsed.netloc, agent_card_path, "", "")
-        )

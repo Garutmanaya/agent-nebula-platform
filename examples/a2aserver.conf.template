@@ -15,6 +15,9 @@ certificate_file = "{{A2A_TLS_CERTIFICATE_FILE}}"
 private_key_file = "{{A2A_TLS_PRIVATE_KEY_FILE}}"
 
 [agent_card]
+# Public URL where this Agent Card is served. This is hosting configuration,
+# not an A2A AgentCard protobuf field and is independent of interface URLs.
+url = "{{A2A_AGENT_CARD_URL}}"
 name = "{{A2A_AGENT_NAME}}"
 description = "{{A2A_AGENT_DESCRIPTION}}"
 version = "{{A2A_AGENT_VERSION}}"

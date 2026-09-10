@@ -25,6 +25,7 @@ class A2AServerPlugin(RuntimePlugin):
         *,
         app: FastAPI,
         agent_card: AgentCard,
+        agent_card_route: str = "/.well-known/agent-card.json",
         request_handler: RequestHandler,
         required: bool = True,
         security: A2AServerSecurityService | None = None,
@@ -34,6 +35,7 @@ class A2AServerPlugin(RuntimePlugin):
 
         self._app = app
         self._agent_card = agent_card
+        self._agent_card_route = agent_card_route
         self._request_handler = request_handler
         self._required = required
         self._security = security
@@ -57,6 +59,7 @@ class A2AServerPlugin(RuntimePlugin):
         adapter = A2AServerAdapter(
             app=self._app,
             agent_card=self._agent_card,
+            agent_card_route=self._agent_card_route,
             request_handler=self._request_handler,
             security=self._security,
             tls=self._tls,
