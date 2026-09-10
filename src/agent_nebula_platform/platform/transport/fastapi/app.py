@@ -21,7 +21,7 @@ from agent_nebula_platform.platform.errors import (
     AuthorizationError,
     ConfigurationError,
 )
-from agent_nebula_platform.platform.health import HealthProvider
+from agent_nebula_platform.platform.health import HealthProvider, HealthRoutes
 from agent_nebula_platform.platform.metrics import MetricsRegistry
 from agent_nebula_platform.platform.transport.http import RequestTargetResolver
 from agent_nebula_platform.platform.transport.rest import RestSkillAdapter
@@ -83,6 +83,7 @@ class FastApiRuntimeAdapter:
         *,
         protected_resource_metadata: ProtectedResourceMetadataProvider | None = None,
         health: HealthProvider | None = None,
+        health_routes: HealthRoutes | None = None,
         metrics: MetricsRegistry | None = None,
         rest: RestSkillAdapter | None = None,
         a2ui: A2UIService | None = None,
@@ -92,6 +93,7 @@ class FastApiRuntimeAdapter:
     ) -> None:
         self._protected_resource_metadata = protected_resource_metadata
         self._health = health
+        self._health_routes = health_routes or HealthRoutes()
         self._metrics = metrics
         self._rest = rest
         self._a2ui = a2ui
@@ -125,29 +127,34 @@ class FastApiRuntimeAdapter:
 
         if self._health is not None:
 
-            @router.get("/health")
+            async def _health_response(*, readiness: bool) -> JSONResponse:
+                """Evaluate one health dimension without duplicating response policy."""
+
+                value = self._health.readiness() if readiness else self._health.health()
+                if inspect.isawaitable(value):
+                    value = await value
+                return JSONResponse(
+                    status_code=200 if value.ready else 503,
+                    content=value.model_dump(mode="json"),
+                )
+
+            @router.get(self._health_routes.health)
             async def health() -> JSONResponse:
-                """Return aggregate liveness state from host and runtime plugins."""
+                """Return aggregate runtime health."""
 
-                value = self._health.health()
-                if inspect.isawaitable(value):
-                    value = await value
-                return JSONResponse(
-                    status_code=200 if value.ready else 503,
-                    content=value.model_dump(mode="json"),
-                )
+                return await _health_response(readiness=False)
 
-            @router.get("/ready")
+            @router.get(self._health_routes.liveness)
+            async def liveness() -> JSONResponse:
+                """Return aggregate process and plugin liveness."""
+
+                return await _health_response(readiness=False)
+
+            @router.get(self._health_routes.readiness)
             async def readiness() -> JSONResponse:
-                """Return aggregate readiness state from host and runtime plugins."""
+                """Return aggregate runtime readiness."""
 
-                value = self._health.readiness()
-                if inspect.isawaitable(value):
-                    value = await value
-                return JSONResponse(
-                    status_code=200 if value.ready else 503,
-                    content=value.model_dump(mode="json"),
-                )
+                return await _health_response(readiness=True)
 
         if self._metrics is not None:
 

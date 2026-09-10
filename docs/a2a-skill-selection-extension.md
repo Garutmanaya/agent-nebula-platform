@@ -35,13 +35,13 @@ Platform adds this declaration to the official Agent Card before it is published
 {
   "uri": "https://agentnebula.ai/extensions/a2a/skill-selection/v1",
   "description": "Agent Nebula deterministic selection of an advertised AgentSkill.id using standard A2A extension metadata",
-  "required": true
+  "required": false
 }
 ```
 
-For a multi-skill deterministic SecureAgent, `required` is `true`: a caller must explicitly select a skill. For a single-skill provider, Platform advertises the extension with `required: false`, preserving ordinary A2A interoperability when no selection is needed.
+The extension is always advertised with `required: false`. Deterministic skill selection is an optional Agent Nebula capability, so generic A2A clients remain interoperable and may send ordinary A2A messages without activating the extension. Nebula-aware clients activate the extension when they need explicit `AgentSkill.id` selection.
 
-If `a2aserver.conf` already declares this URI, its `required` value must agree with the Platform-computed requirement. Platform fails closed on a conflict.
+If `a2aserver.conf` already declares this URI, it must also declare the extension as optional. Platform fails closed on a conflicting `required` value.
 
 ## Request metadata schema
 

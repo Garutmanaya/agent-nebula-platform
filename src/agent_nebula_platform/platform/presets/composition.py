@@ -234,6 +234,7 @@ def compose_feature_plugins(
                 components.protected_resource_metadata if metadata_enabled else None
             ),
             health=components.health if health_enabled else None,
+            health_routes=components.health_routes if health_enabled else None,
             enable_rest=rest_enabled,
             enable_a2ui=a2ui_enabled,
             api_prefix=server.api_prefix,

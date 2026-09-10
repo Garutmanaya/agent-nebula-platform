@@ -18,7 +18,7 @@ from agent_nebula_platform.a2ui import (
 from agent_nebula_platform.a2ui.actions import A2UIActionDispatcher
 from agent_nebula_platform.a2ui.session import A2UISessionService
 from agent_nebula_platform.integrations.nebula.onboarding import OnboardingSettings
-from agent_nebula_platform.platform.health import HealthProvider
+from agent_nebula_platform.platform.health import HealthProvider, HealthRoutes
 from agent_nebula_platform.platform.metrics import MetricsRegistry
 from agent_nebula_platform.platform.plugins.base import RuntimePlugin
 from agent_nebula_platform.platform.scheduler import ScheduledJob
@@ -76,6 +76,7 @@ class RuntimeFeatureComponents:
     skill_definitions: tuple[SkillDefinition, ...] = ()
     protected_resource_metadata: ProtectedResourceMetadataProvider | None = None
     health: HealthProvider | None = None
+    health_routes: HealthRoutes | None = None
     onboarding_settings: OnboardingSettings | None = None
     onboarding_payload_provider: OnboardingPayloadProvider | None = None
     oauth_client_registration: RuntimePlugin | None = None
@@ -105,6 +106,7 @@ class RuntimeFeatureComponents:
         skill_definitions: Iterable[SkillDefinition] = (),
         protected_resource_metadata: ProtectedResourceMetadataProvider | None = None,
         health: HealthProvider | None = None,
+        health_routes: HealthRoutes | None = None,
         onboarding_settings: OnboardingSettings | None = None,
         onboarding_payload_provider: OnboardingPayloadProvider | None = None,
         oauth_client_registration: RuntimePlugin | None = None,
@@ -133,6 +135,7 @@ class RuntimeFeatureComponents:
             skill_definitions=tuple(skill_definitions),
             protected_resource_metadata=protected_resource_metadata,
             health=health,
+            health_routes=health_routes,
             onboarding_settings=onboarding_settings,
             onboarding_payload_provider=onboarding_payload_provider,
             oauth_client_registration=oauth_client_registration,

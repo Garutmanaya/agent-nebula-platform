@@ -74,9 +74,13 @@ def test_embedded_preset_attaches_health_routes() -> None:
     try:
         with TestClient(app) as client:
             response = client.get("/health")
+            live = client.get("/health/live")
+            ready = client.get("/health/ready")
 
         assert response.status_code == 200
         assert response.json()["ready"] is True
+        assert live.status_code == 200
+        assert ready.status_code == 200
     finally:
         asyncio.run(runtime.close())
 

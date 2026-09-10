@@ -20,7 +20,10 @@ from agent_nebula_platform.integrations.nebula.onboarding import (
 from agent_nebula_platform.platform.configuration.application import (
     PlatformApplicationConfigurationLoader,
 )
-from agent_nebula_platform.platform.health import StaticHealthProvider
+from agent_nebula_platform.platform.health import (
+    HealthEndpointConfigurationLoader,
+    StaticHealthProvider,
+)
 from agent_nebula_platform.platform.presets import RuntimeFeatureComponents
 from agent_nebula_platform.platform.presets.standalone import (
     StandaloneApplicationSettings,
@@ -39,6 +42,7 @@ from agent_nebula_platform.platform.presets.standalone.settings import (
 )
 from agent_nebula_platform.protocols.a2a.extensions.a2ui import ensure_a2ui_extension
 from agent_nebula_platform.protocols.a2a.extensions import (
+    ensure_health_extension,
     ensure_skill_selection_extension,
     validate_executable_skills,
 )
@@ -123,6 +127,7 @@ class A2AStandaloneApplicationComposer:
 
         server_configuration = A2AServerConfigurationService().load(server_config)
         card = server_configuration.agent_card
+        health_endpoints = HealthEndpointConfigurationLoader().load(server_config)
         # Backward compatibility keeps the former single ``skill`` composition
         # call valid while SecureAgent migrates to passing all registered skills.
         executable_skills = skills or ((skill,) if skill is not None else ())
@@ -130,13 +135,15 @@ class A2AStandaloneApplicationComposer:
             card, tuple(executable.skill_id for executable in executable_skills)
         )
 
-        # NEBULA A2A EXTENSION: multi-skill deterministic providers require
-        # explicit client-side AgentSkill selection. Single-skill providers
-        # advertise the same extension as optional and remain usable by generic
-        # A2A clients that send ordinary messages without extension metadata.
-        ensure_skill_selection_extension(
-            card, required=len(executable_skills) > 1
-        )
+        # NEBULA A2A EXTENSION: deterministic skill selection is an optional
+        # capability. Generic A2A clients remain interoperable and may send
+        # ordinary messages without activating Agent Nebula extension metadata.
+        ensure_skill_selection_extension(card, required=False)
+
+        # NEBULA A2A EXTENSION: operational health is independently configured
+        # and advertised. It never changes A2A invocation semantics.
+        if health_endpoints is not None:
+            ensure_health_extension(card, health_endpoints)
 
         # A2UI is configured independently from A2A. The composer receives an
         # explicit A2UI configuration location and delegates only Agent Card
@@ -212,6 +219,7 @@ class A2AStandaloneApplicationComposer:
         )
         components = RuntimeFeatureComponents.create(
             health=StaticHealthProvider(),
+            health_routes=health_endpoints.routes if health_endpoints is not None else None,
             onboarding_settings=onboarding_settings,
             onboarding_payload_provider=payload_provider,
             protected_resource=(

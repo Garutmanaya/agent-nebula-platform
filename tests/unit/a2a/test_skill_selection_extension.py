@@ -68,19 +68,19 @@ def test_selected_skill_requires_activation() -> None:
     ) == "travel.search_flights"
 
 
-def test_agent_card_declares_required_extension_for_multi_skill() -> None:
+def test_agent_card_declares_optional_skill_selection_extension() -> None:
     card = _card()
 
-    ensure_skill_selection_extension(card, required=True)
+    ensure_skill_selection_extension(card, required=False)
 
     extension = card.capabilities.extensions[0]
     assert extension.uri == NEBULA_SKILL_SELECTION_EXTENSION_URI
-    assert extension.required is True
+    assert extension.required is False
 
 
 def test_client_selection_must_reference_advertised_skill() -> None:
     card = _card()
-    ensure_skill_selection_extension(card, required=True)
+    ensure_skill_selection_extension(card, required=False)
 
     require_supported_skill(card, "travel.search_flights")
     with pytest.raises(ConfigurationError, match="not advertised"):

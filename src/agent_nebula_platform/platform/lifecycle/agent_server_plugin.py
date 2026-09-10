@@ -6,7 +6,11 @@ from fastapi import FastAPI
 
 from agent_nebula_platform.a2ui.service import A2UIService
 from agent_nebula_platform.platform.context import RuntimeContext
-from agent_nebula_platform.platform.health import HealthProvider, RuntimeHealthService
+from agent_nebula_platform.platform.health import (
+    HealthRoutes,
+    HealthProvider,
+    RuntimeHealthService,
+)
 from agent_nebula_platform.platform.metrics import MetricsRegistry
 from agent_nebula_platform.platform.plugins.base import RuntimePlugin
 from agent_nebula_platform.platform.transport.fastapi import FastApiRuntimeAdapter
@@ -26,6 +30,7 @@ class AgentServerPlugin(RuntimePlugin):
         app: FastAPI,
         protected_resource_metadata: ProtectedResourceMetadataProvider | None = None,
         health: HealthProvider | None = None,
+        health_routes: HealthRoutes | None = None,
         enable_rest: bool = True,
         enable_a2ui: bool = True,
         api_prefix: str = "/api/v1",
@@ -36,6 +41,7 @@ class AgentServerPlugin(RuntimePlugin):
         self._app = app
         self._protected_resource_metadata = protected_resource_metadata
         self._health = health
+        self._health_routes = health_routes
         self._enable_rest = enable_rest
         self._enable_a2ui = enable_a2ui
         self._api_prefix = api_prefix
@@ -76,6 +82,7 @@ class AgentServerPlugin(RuntimePlugin):
         adapter = FastApiRuntimeAdapter(
             protected_resource_metadata=self._protected_resource_metadata,
             health=runtime_health,
+            health_routes=self._health_routes,
             metrics=metrics,
             rest=RestSkillAdapter(invocation)
             if self._enable_rest and invocation
