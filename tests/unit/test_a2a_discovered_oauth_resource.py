@@ -1,3 +1,4 @@
+from inspect import signature
 from pathlib import Path
 
 from agent_nebula_platform.protocols.a2a.client.client_configuration import (
@@ -9,7 +10,9 @@ from agent_nebula_platform.protocols.a2a.client.discovered_oauth import (
 )
 
 
-def test_discovered_oauth_prefers_registry_resource_override() -> None:
+def test_discovered_oauth_does_not_accept_registry_resource_override() -> None:
+    assert "resource" not in signature(A2ADiscoveredOAuth2CredentialProvider).parameters
+
     provider = A2ADiscoveredOAuth2CredentialProvider(
         configuration=A2AClientOAuthConfiguration(
             client_id_file=Path("client-id"),
@@ -18,7 +21,6 @@ def test_discovered_oauth_prefers_registry_resource_override() -> None:
         ),
         tls=A2AClientTlsConfiguration(),
         timeout_seconds=30,
-        resource="https://provider.example/resource/",
     )
 
-    assert provider._resource_override == "https://provider.example/resource"
+    assert not hasattr(provider, "_resource_override")

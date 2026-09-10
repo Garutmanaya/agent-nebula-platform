@@ -5,7 +5,6 @@ from __future__ import annotations
 from pathlib import Path
 
 from agent_nebula_platform.a2ui.configuration import A2UIConfiguration
-from agent_nebula_platform.security.oauth.client.service import OAuthClientService
 from agent_nebula_platform.protocols.a2a.extensions.a2ui import A2UIClientExtension
 from agent_nebula_platform.protocols.a2a.extensions.skill_selection import (
     SkillSelectionClientExtension,
@@ -17,7 +16,6 @@ from .client_credentials import (
     A2AApiKeyCredentialProvider,
     A2AHttpCredentialProvider,
     A2AMutualTlsCredentialProvider,
-    A2AOAuth2CredentialProvider,
     A2AOidcCredentialProvider,
     load_static_credentials,
 )
@@ -40,23 +38,17 @@ class A2AClientServiceFactory:
         self,
         path: Path,
         *,
-        oauth_service: OAuthClientService | None = None,
-        resource: str | None = None,
         a2ui_configuration: A2UIConfiguration | None = None,
     ) -> A2AClientAdapter:
         """Load ``a2aclient.conf`` and compose transport plus security negotiation.
 
-        ``resource`` is the protected-resource identifier selected by discovery.
-        It is deliberately supplied by the caller rather than inferred from an
-        arbitrary Agent Card URL.  OAuth is available only when both a Platform
-        OAuth client service and that resource identifier are present.
+        Remote A2A and security facts are deliberately not accepted here. The
+        resolved Agent Card and standards-based security metadata are authoritative.
         """
 
         configuration = self._loader.load(path)
         return self.create_from_configuration(
             configuration,
-            oauth_service=oauth_service,
-            resource=resource,
             a2ui_configuration=a2ui_configuration,
         )
 
@@ -64,8 +56,6 @@ class A2AClientServiceFactory:
     def create_from_configuration(
         configuration: A2AClientConfiguration,
         *,
-        oauth_service: OAuthClientService | None = None,
-        resource: str | None = None,
         a2ui_configuration: A2UIConfiguration | None = None,
     ) -> A2AClientAdapter:
         """Compose one official A2A client adapter from validated settings."""
@@ -82,17 +72,12 @@ class A2AClientServiceFactory:
                 )
             ),
         ]
-        if oauth_service is not None and resource:
-            providers.append(
-                A2AOAuth2CredentialProvider(service=oauth_service, resource=resource)
-            )
-        elif configuration.oauth is not None:
+        if configuration.oauth is not None:
             providers.append(
                 A2ADiscoveredOAuth2CredentialProvider(
                     configuration=configuration.oauth,
                     tls=configuration.tls,
                     timeout_seconds=configuration.timeout_seconds,
-                    resource=resource,
                 )
             )
 

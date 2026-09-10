@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from collections.abc import Callable, Mapping
 from pathlib import Path
+from urllib.parse import urlsplit, urlunsplit
 from datetime import datetime, timezone
 from typing import TYPE_CHECKING, Any
 from uuid import uuid4
@@ -51,15 +52,30 @@ class A2AClientAdapter:
         self._extension_context_builder = A2AClientExtensionContextBuilder(extensions)
         self._closed = False
 
-    async def resolve_agent_card(self, base_url: str) -> AgentCard:
-        """Resolve an official A2A 1.0 Agent Card from ``base_url``."""
+    async def resolve_agent_card(self, location: str) -> AgentCard:
+        """Resolve the authoritative A2A 1.0 Agent Card from a discovery location.
+
+        ``location`` may be either an agent base URL or the explicit Agent Card
+        URL returned by an optional registry. Registry data is used only to locate
+        the card; all invocation and security facts are read from the resolved card.
+        """
 
         self._ensure_open()
+        base_url, card_path = self._agent_card_resolution_target(location)
         async with self._new_http_client() as client:
             resolver = A2ACardResolver(client, base_url)
-            return await resolver.get_agent_card(
-                relative_card_path=self._configuration.agent_card_path
-            )
+            return await resolver.get_agent_card(relative_card_path=card_path)
+
+    def _agent_card_resolution_target(self, location: str) -> tuple[str, str]:
+        """Normalize a base URL or explicit Agent Card URL for ``A2ACardResolver``."""
+
+        configured_path = self._configuration.agent_card_path or "/.well-known/agent-card.json"
+        parsed = urlsplit(location)
+        if parsed.path.endswith(configured_path):
+            base_path = parsed.path[: -len(configured_path)].rstrip("/")
+            base_url = urlunsplit((parsed.scheme, parsed.netloc, base_path, "", ""))
+            return base_url, configured_path
+        return location, configured_path
 
     async def resolve_agent_card_document(self, base_url: str) -> dict[str, Any]:
         """Resolve an Agent Card and return its protocol-neutral JSON representation.
