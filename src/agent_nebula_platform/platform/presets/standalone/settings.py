@@ -215,6 +215,23 @@ class StandaloneRuntimeSettings(BaseModel):
             runtime_root=self.application.runtime_root,
             product_root=self.application.product_root,
         )
+
+        print(
+            "\n=== AGENT NEBULA PATH DEBUG ===\n"
+            f"application.runtime_root = {self.application.runtime_root!r}\n"
+            f"application.product_root = {self.application.product_root!r}\n"
+            f"resolver.runtime_root    = {resolver.runtime_root!r}\n"
+            f"resolver.product_root    = {resolver.product_root!r}\n"
+            f"nebula.ca_file           = "
+            f"{self.nebula.ca_file if self.nebula else None!r}\n"
+            f"nebula.client_cert       = "
+            f"{self.nebula.client_certificate_file if self.nebula else None!r}\n"
+            f"nebula.client_key        = "
+            f"{self.nebula.client_private_key_file if self.nebula else None!r}\n"
+            f"state.directory          = {self.state.directory!r}\n"
+            "===============================\n",
+            flush=True,
+        )
         return self.model_copy(
             update={
                 "application": self.application.model_copy(

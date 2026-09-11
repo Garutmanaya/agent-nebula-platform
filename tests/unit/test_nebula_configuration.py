@@ -31,3 +31,18 @@ def test_agent_only_onboarding_has_a2a_provider_role_without_oauth_resource() ->
     assert payload["roles"] == ["A2A_PROVIDER"]
     assert payload["authentication"] == {"method": "OPEN"}
     assert "protected_resource" not in payload
+
+
+def test_agent_onboarding_uses_explicit_external_agent_id() -> None:
+    """Keep Registry identity independent from the official A2A Agent Card name."""
+
+    payload = build_agent_onboarding_payload(
+        entity_name="Flight Booking Agent",
+        agent_card_uri="https://example.test/.well-known/agent-card.json",
+        protocols=("A2A",),
+        capabilities=("booking",),
+        external_agent_id="exp_test",
+    )
+
+    assert payload["entity_name"] == "Flight Booking Agent"
+    assert payload["agent"]["metadata"]["external_agent_id"] == "exp_test"

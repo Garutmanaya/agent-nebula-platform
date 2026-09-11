@@ -287,6 +287,7 @@ class A2AStandaloneApplicationComposer:
                 protocols=("A2A",),
                 capabilities=capabilities,
                 authentication_method=registration.authentication.value,
+                external_agent_id=registration.external_agent_id,
             )
         else:
             # OAuth protection is described using RFC 9728 and registered as a
@@ -311,6 +312,7 @@ class A2AStandaloneApplicationComposer:
                 protocols=("A2A",),
                 capabilities=capabilities,
                 authentication_method=registration.authentication.value,
+                external_agent_id=registration.external_agent_id,
             )
 
         def payload_provider() -> dict:

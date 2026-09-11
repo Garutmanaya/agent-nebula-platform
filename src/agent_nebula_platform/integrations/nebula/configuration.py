@@ -51,6 +51,7 @@ class NebulaRegistrationSettings(BaseModel):
         NebulaRegistrationAuthentication.OPEN
     )
     api_key_file: Path | None = None
+    external_agent_id: str | None = Field(default=None, min_length=1)
     state_key: str = Field(default="nebula-registration", min_length=1)
     retry_count: int = Field(default=3, ge=1, le=20)
     retry_delay_seconds: float = Field(default=1.0, ge=0, le=60)

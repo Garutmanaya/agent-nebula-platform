@@ -25,6 +25,7 @@ def build_agent_onboarding_payload(
     protocols: tuple[str, ...],
     capabilities: tuple[str, ...],
     authentication_method: str = "OPEN",
+    external_agent_id: str | None = None,
 ) -> dict[str, Any]:
     """Build A2A provider onboarding without OAuth resource roles."""
 
@@ -44,6 +45,11 @@ def build_agent_onboarding_payload(
             agent_card_uri=agent_card_uri,
             protocols=frozenset(protocols),
             capabilities=capabilities,
+            metadata=(
+                {"external_agent_id": external_agent_id}
+                if external_agent_id is not None
+                else None
+            ),
         ),
     )
     return _public_payload(request)
@@ -59,6 +65,7 @@ def build_provider_onboarding_payload(
     capabilities: tuple[str, ...],
     authentication_method: str = "API_KEY",
     resource_type: str = "A2A_AGENT",
+    external_agent_id: str | None = None,
 ) -> dict[str, Any]:
     """Build a validated provider onboarding wire payload without credentials."""
 
@@ -78,6 +85,11 @@ def build_provider_onboarding_payload(
             agent_card_uri=agent_card_uri,
             protocols=frozenset(protocols),
             capabilities=capabilities,
+            metadata=(
+                {"external_agent_id": external_agent_id}
+                if external_agent_id is not None
+                else None
+            ),
         ),
         protected_resource=ProtectedResourceRegistrationInput(
             metadata=ProtectedResourceMetadata.model_validate(
