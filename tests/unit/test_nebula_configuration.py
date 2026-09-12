@@ -6,6 +6,7 @@ from agent_nebula_platform.integrations.nebula import (
 )
 from agent_nebula_platform.integrations.nebula.onboarding import (
     build_agent_onboarding_payload,
+    build_provider_onboarding_payload,
 )
 
 
@@ -46,3 +47,35 @@ def test_agent_onboarding_uses_explicit_external_agent_id() -> None:
 
     assert payload["entity_name"] == "Flight Booking Agent"
     assert payload["agent"]["metadata"]["external_agent_id"] == "exp_test"
+
+
+def test_agent_onboarding_without_external_agent_id_uses_empty_metadata() -> None:
+    """Keep external Registry identity optional for existing callers."""
+
+    payload = build_agent_onboarding_payload(
+        entity_name="Echo",
+        agent_card_uri="https://echo.example/.well-known/agent-card.json",
+        protocols=("A2A",),
+        capabilities=("echo",),
+    )
+
+    assert payload["agent"]["metadata"] == {}
+
+
+def test_provider_onboarding_without_external_agent_id_uses_empty_metadata() -> None:
+    """Preserve Solutions onboarding when no explicit external identity is supplied."""
+
+    metadata_uri = "https://provider.example/.well-known/oauth-protected-resource"
+    payload = build_provider_onboarding_payload(
+        entity_name="IT Demand Agent",
+        agent_card_uri="https://provider.example/.well-known/agent-card.json",
+        protected_resource_metadata_uri=metadata_uri,
+        protected_resource_document={
+            "resource": "https://provider.example",
+            "authorization_servers": ["https://auth.example"],
+        },
+        protocols=("A2A",),
+        capabilities=("demand",),
+    )
+
+    assert payload["agent"]["metadata"] == {}

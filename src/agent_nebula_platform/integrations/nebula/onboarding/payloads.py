@@ -48,7 +48,7 @@ def build_agent_onboarding_payload(
             metadata=(
                 {"external_agent_id": external_agent_id}
                 if external_agent_id is not None
-                else None
+                else {}
             ),
         ),
     )
@@ -88,7 +88,7 @@ def build_provider_onboarding_payload(
             metadata=(
                 {"external_agent_id": external_agent_id}
                 if external_agent_id is not None
-                else None
+                else {}
             ),
         ),
         protected_resource=ProtectedResourceRegistrationInput(
