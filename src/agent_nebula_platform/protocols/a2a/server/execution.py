@@ -14,6 +14,12 @@ from google.protobuf.json_format import MessageToDict
 from agent_nebula_platform.platform.errors import ConfigurationError
 from agent_nebula_platform.a2ui.models import A2UIActionRequest
 from agent_nebula_platform.protocols.a2a.extensions.a2ui.parts import parse_a2ui_action_part
+from agent_nebula_platform.protocols.a2a.extensions.a2ui.observability import (
+    summarize_a2ui_message_metadata,
+    summarize_a2ui_parts,
+)
+from agent_nebula_platform.protocols.a2a.observability import A2AProtocolTraceEvent, A2AProtocolTracer
+from agent_nebula_platform.protocols.a2a.observability.tracer import create_protocol_tracer_from_environment
 from agent_nebula_platform.skills import SkillResult
 
 from .result_mapper import A2AResultMapper
@@ -51,13 +57,17 @@ class A2AAgentExecutor(AgentExecutor):
         skills: tuple[A2AExecutableSkill, ...],
         *,
         result_mapper: A2AResultMapper | None = None,
+        protocol_tracer: A2AProtocolTracer | None = None,
     ) -> None:
         """Bind executable skills by their stable advertised identifiers."""
 
         if not skills:
             raise ConfigurationError("A2A AgentExecutor requires at least one skill")
         self._skills = {skill.skill_id: skill for skill in skills}
-        self._result_mapper = result_mapper or A2AResultMapper()
+        self._protocol_tracer = protocol_tracer or create_protocol_tracer_from_environment()
+        self._result_mapper = result_mapper or A2AResultMapper(
+            protocol_tracer=self._protocol_tracer
+        )
         if len(self._skills) != len(skills):
             raise ConfigurationError("A2A AgentExecutor skill identifiers must be unique")
 
@@ -65,6 +75,7 @@ class A2AAgentExecutor(AgentExecutor):
         """Translate an A2A message into the generic business-handler payload."""
 
         message = context.message
+        self._trace_incoming_request(message)
         text = get_message_text(message, delimiter=" ") if message is not None else ""
         payload: dict[str, object] = {"message": text}
         if message is not None:
@@ -125,6 +136,51 @@ class A2AAgentExecutor(AgentExecutor):
                 f"A2A skill '{skill.skill_id}' must return a mapping/dict or SkillResult"
             )
         await event_queue.enqueue_event(self._result_mapper.map(result))
+
+
+    def _trace_incoming_request(self, message: object | None) -> None:
+        """Trace an inbound A2A message without affecting request execution.
+
+        Observability is deliberately fail-open.  Protocol inspection, protobuf
+        conversion, A2UI summarization, and tracer sinks are diagnostic concerns;
+        none may change the result of an otherwise valid A2A request.
+        """
+
+        if message is None:
+            return
+        try:
+            message_document = MessageToDict(
+                message, preserving_proto_field_name=True
+            )
+            fields: dict[str, object] = {
+                "messageId": (
+                    message_document.get("message_id")
+                    or message_document.get("messageId")
+                ),
+                "contextId": (
+                    message_document.get("context_id")
+                    or message_document.get("contextId")
+                ),
+                "taskId": (
+                    message_document.get("task_id")
+                    or message_document.get("taskId")
+                ),
+            }
+            metadata_document = message_document.get("metadata")
+            if isinstance(metadata_document, Mapping):
+                a2ui_metadata = summarize_a2ui_message_metadata(metadata_document)
+                if a2ui_metadata is not None:
+                    fields["a2uiMetadata"] = a2ui_metadata
+            a2ui_parts = summarize_a2ui_parts(message_document)
+            if a2ui_parts:
+                fields["a2uiParts"] = a2ui_parts
+            if self._protocol_tracer.include_payloads:
+                fields["message"] = message_document
+            self._protocol_tracer.emit(
+                A2AProtocolTraceEvent("request.receive", "remote->server", fields)
+            )
+        except Exception:  # noqa: BLE001 - tracing must never break A2A execution.
+            return
 
     async def cancel(self, context: RequestContext, event_queue: EventQueue) -> None:
         """Acknowledge cancellation for stateless business-handler execution."""

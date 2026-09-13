@@ -97,3 +97,28 @@ New A2A-specific behavior belongs under `protocols/a2a/`. Reusable OAuth or secu
 ## Agent Nebula deterministic skill selection
 
 Multi-skill deterministic providers use the formal Agent Nebula A2A skill-selection extension rather than modifying core A2A request models. Skill selection occurs on the client; the provider validates and dispatches the selected advertised `AgentSkill.id`. See [Agent Nebula A2A Skill-Selection Extension](a2a-skill-selection-extension.md) for the complete wire contract, security behavior, failure semantics, and compatibility rules.
+
+## Development protocol trace
+
+Platform provides an opt-in logical protocol trace for diagnosing A2A 1.0 and
+A2UI-over-A2A exchanges. The trace is emitted immediately around the official
+A2A SDK boundary; it is not a second transport implementation and does not alter
+messages.
+
+Set `ANU_A2A_PROTOCOL_TRACE=true` on the client and/or provider process to emit
+redacted structural events through the
+`agent_nebula_platform.protocols.a2a.trace` logger. Add
+`ANU_A2A_PROTOCOL_TRACE_PAYLOADS=true` only in a controlled development
+environment when the normalized A2A request/response documents are also needed.
+Authorization headers, API keys, OAuth tokens, DPoP material, cookies, passwords,
+private-key fields, and other secret-bearing values are recursively redacted.
+
+Typical events are `agent_card.resolved`, `request.send`, `request.receive`,
+`response.map`, and `response.receive`. A2UI-aware summaries show advertised
+extension parameters, renderer capability metadata, the A2UI MIME type, message
+type, surface/catalog identifiers, and component counts. This makes catalog
+negotiation and A2UI DataPart flow observable without decrypting HTTPS traffic.
+
+Protocol tracing is disabled by default and the no-op tracer does not materialize
+payload documents. Tests or host applications may inject another implementation
+of `A2AProtocolTracer` without changing client, server, security, or A2UI logic.

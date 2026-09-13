@@ -6,7 +6,7 @@ from collections.abc import Mapping
 from typing import Any
 from uuid import uuid4
 
-from google.protobuf.json_format import ParseDict
+from google.protobuf.json_format import MessageToDict, ParseDict
 from google.protobuf.struct_pb2 import Struct, Value
 
 from a2a.types import Message, Part, Role
@@ -14,6 +14,9 @@ from a2a.types import Message, Part, Role
 from agent_nebula_platform.a2ui.models import A2UISurface
 from agent_nebula_platform.platform.errors import ConfigurationError
 from agent_nebula_platform.protocols.a2a.extensions.a2ui.parts import create_a2ui_part
+from agent_nebula_platform.protocols.a2a.extensions.a2ui.observability import summarize_a2ui_parts
+from agent_nebula_platform.protocols.a2a.observability import A2AProtocolTraceEvent, A2AProtocolTracer
+from agent_nebula_platform.protocols.a2a.observability.tracer import create_protocol_tracer_from_environment
 from agent_nebula_platform.skills import SkillResult
 
 
@@ -24,6 +27,11 @@ class A2AResultMapper:
     is delegated to the isolated A2UI/A2A binding and becomes an additional
     DataPart. The mapper does not interpret A2UI documents or configuration.
     """
+
+    def __init__(self, *, protocol_tracer: A2AProtocolTracer | None = None) -> None:
+        """Create a result mapper with an independently replaceable protocol tracer."""
+
+        self._protocol_tracer = protocol_tracer or create_protocol_tracer_from_environment()
 
     def map(self, result: Mapping[str, object] | SkillResult) -> Message:
         """Return one official A2A agent message preserving all result channels."""
@@ -51,7 +59,31 @@ class A2AResultMapper:
         }
         if metadata:
             arguments["metadata"] = ParseDict(metadata, Struct())
-        return Message(**arguments)
+        message = Message(**arguments)
+        self._trace_mapped_response(message, part_count=len(parts))
+        return message
+
+    def _trace_mapped_response(self, message: Message, *, part_count: int) -> None:
+        """Trace a mapped response without affecting the returned A2A message."""
+
+        try:
+            document = MessageToDict(message, preserving_proto_field_name=True)
+            fields: dict[str, Any] = {
+                "messageId": (
+                    document.get("message_id") or document.get("messageId")
+                ),
+                "partCount": part_count,
+            }
+            a2ui_parts = summarize_a2ui_parts(document)
+            if a2ui_parts:
+                fields["a2uiParts"] = a2ui_parts
+            if self._protocol_tracer.include_payloads:
+                fields["message"] = document
+            self._protocol_tracer.emit(
+                A2AProtocolTraceEvent("response.map", "server->remote", fields)
+            )
+        except Exception:  # noqa: BLE001 - tracing must never break response mapping.
+            return
 
     @staticmethod
     def _normalize(

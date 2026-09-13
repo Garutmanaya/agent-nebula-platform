@@ -21,6 +21,18 @@ from agent_nebula_platform.platform.errors import ConfigurationError
 from agent_nebula_platform.protocols.a2a.extensions.a2ui.extension import A2UI_EXTENSION_URI
 from agent_nebula_platform.protocols.a2a.extensions.a2ui.parts import create_a2ui_action_part
 from agent_nebula_platform.protocols.a2a.extensions import require_supported_skill
+from agent_nebula_platform.protocols.a2a.extensions.a2ui.observability import (
+    summarize_a2ui_agent_card,
+    summarize_a2ui_message_metadata,
+    summarize_a2ui_parts,
+)
+from agent_nebula_platform.protocols.a2a.observability import (
+    A2AProtocolTraceEvent,
+    A2AProtocolTracer,
+)
+from agent_nebula_platform.protocols.a2a.observability.tracer import (
+    create_protocol_tracer_from_environment,
+)
 from agent_nebula_platform.platform.tls import FileTlsContextProvider
 
 from .client_configuration import A2AClientConfiguration
@@ -44,12 +56,14 @@ class A2AClientAdapter:
         *,
         security_interceptor: A2AClientSecurityInterceptor | None = None,
         extensions: tuple[A2AClientExtension, ...] = (),
+        protocol_tracer: A2AProtocolTracer | None = None,
     ) -> None:
         """Create one reusable client adapter from validated Platform configuration."""
 
         self._configuration = configuration
         self._security_interceptor = security_interceptor
         self._extension_context_builder = A2AClientExtensionContextBuilder(extensions)
+        self._protocol_tracer = protocol_tracer or create_protocol_tracer_from_environment()
         self._closed = False
 
     async def resolve_agent_card(self, location: str) -> AgentCard:
@@ -64,7 +78,9 @@ class A2AClientAdapter:
         base_url, card_path = self._agent_card_resolution_target(location)
         async with self._new_http_client() as client:
             resolver = A2ACardResolver(client, base_url)
-            return await resolver.get_agent_card(relative_card_path=card_path)
+            card = await resolver.get_agent_card(relative_card_path=card_path)
+        self._trace_resolved_agent_card(card, location=location)
+        return card
 
     def _agent_card_resolution_target(self, location: str) -> tuple[str, str]:
         """Normalize a base URL or explicit Agent Card URL for ``A2ACardResolver``."""
@@ -189,15 +205,24 @@ class A2AClientAdapter:
         if extension_context.request_metadata is not None:
             request_arguments["metadata"] = extension_context.request_metadata
         request = SendMessageRequest(**request_arguments)
+        request_document = MessageToDict(request, preserving_proto_field_name=True)
+        self._trace_outgoing_request(
+            request_document,
+            card=card,
+            skill_id=skill_id,
+            operation="SendMessage",
+        )
         client = self.create(card, skill_id=skill_id)
         responses: list[dict[str, Any]] = []
         try:
             async for response in client.send_message(
                 request, context=extension_context.call_context
             ):
-                responses.append(
-                    MessageToDict(response, preserving_proto_field_name=True)
+                response_document = MessageToDict(
+                    response, preserving_proto_field_name=True
                 )
+                responses.append(response_document)
+                self._trace_incoming_response(response_document)
         finally:
             await client.close()
         return tuple(responses)
@@ -260,16 +285,113 @@ class A2AClientAdapter:
         if extension_context.request_metadata is not None:
             request_arguments["metadata"] = extension_context.request_metadata
         request = SendMessageRequest(**request_arguments)
+        request_document = MessageToDict(request, preserving_proto_field_name=True)
+        self._trace_outgoing_request(
+            request_document,
+            card=card,
+            skill_id=skill_id,
+            operation="SendMessage",
+        )
         client = self.create(card, skill_id=skill_id)
         responses: list[dict[str, Any]] = []
         try:
             async for response in client.send_message(
                 request, context=extension_context.call_context
             ):
-                responses.append(MessageToDict(response, preserving_proto_field_name=True))
+                response_document = MessageToDict(
+                    response, preserving_proto_field_name=True
+                )
+                responses.append(response_document)
+                self._trace_incoming_response(response_document)
         finally:
             await client.close()
         return tuple(responses)
+
+
+    def _trace_resolved_agent_card(self, card: AgentCard, *, location: str) -> None:
+        """Trace Agent Card discovery without affecting successful discovery."""
+
+        try:
+            card_document = MessageToDict(card, preserving_proto_field_name=True)
+            fields: dict[str, Any] = {
+                "location": location,
+                "name": card.name,
+                "interfaces": card_document.get("supportedInterfaces", []),
+            }
+            a2ui = summarize_a2ui_agent_card(card_document)
+            if a2ui is not None:
+                fields["a2ui"] = a2ui
+            if self._protocol_tracer.include_payloads:
+                fields["agentCard"] = card_document
+            self._protocol_tracer.emit(
+                A2AProtocolTraceEvent(
+                    "agent_card.resolved", "remote->client", fields
+                )
+            )
+        except Exception:  # noqa: BLE001 - tracing must never break A2A discovery.
+            return
+
+    def _trace_outgoing_request(
+        self,
+        request: dict[str, Any],
+        *,
+        card: AgentCard,
+        skill_id: str | None,
+        operation: str,
+    ) -> None:
+        """Trace an outbound A2A request without affecting request delivery."""
+
+        try:
+            message = request.get("message") if isinstance(request, dict) else None
+            metadata = message.get("metadata", {}) if isinstance(message, dict) else {}
+            fields: dict[str, Any] = {
+                "operation": operation,
+                "agent": card.name,
+                "skillId": skill_id,
+                "messageId": (
+                    message.get("message_id") or message.get("messageId")
+                )
+                if isinstance(message, dict)
+                else None,
+                "contextId": (
+                    message.get("context_id") or message.get("contextId")
+                )
+                if isinstance(message, dict)
+                else None,
+                "taskId": (message.get("task_id") or message.get("taskId"))
+                if isinstance(message, dict)
+                else None,
+            }
+            if isinstance(metadata, Mapping):
+                a2ui_metadata = summarize_a2ui_message_metadata(metadata)
+                if a2ui_metadata is not None:
+                    fields["a2uiMetadata"] = a2ui_metadata
+            a2ui_parts = summarize_a2ui_parts(request)
+            if a2ui_parts:
+                fields["a2uiParts"] = a2ui_parts
+            if self._protocol_tracer.include_payloads:
+                fields["request"] = request
+            self._protocol_tracer.emit(
+                A2AProtocolTraceEvent("request.send", "client->remote", fields)
+            )
+        except Exception:  # noqa: BLE001 - tracing must never break A2A delivery.
+            return
+
+    def _trace_incoming_response(self, response: dict[str, Any]) -> None:
+        """Trace an inbound A2A response without affecting response handling."""
+
+        try:
+            fields: dict[str, Any] = {}
+            a2ui_parts = summarize_a2ui_parts(response)
+            if a2ui_parts:
+                fields["a2uiParts"] = a2ui_parts
+            if self._protocol_tracer.include_payloads:
+                fields["response"] = response
+            self._protocol_tracer.emit(
+                A2AProtocolTraceEvent("response.receive", "remote->client", fields)
+            )
+        except Exception:  # noqa: BLE001 - tracing must never break response handling.
+            return
 
     async def close(self) -> None:
         """Close Platform-owned transport resources idempotently."""
