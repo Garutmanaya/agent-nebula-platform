@@ -21,8 +21,8 @@ _AGENT_MESSAGE_KEYS = frozenset(
         "updateComponents",
         "updateDataModel",
         "deleteSurface",
-        "actionResponse",
-        "callFunction",
+        "callRendererFunction",
+        "agentFunctionResponse",
     }
 )
 
@@ -52,19 +52,11 @@ class A2UIMessage(BaseModel):
             raise ValueError("A2UI message must contain exactly one agent message type")
         allowed_envelope_fields = {"version"}
         message_type = next(iter(message_keys))
-        if message_type == "actionResponse":
-            allowed_envelope_fields.add("actionId")
-        elif message_type == "callFunction":
-            allowed_envelope_fields.update({"functionCallId", "wantResponse"})
         unexpected = set(value) - allowed_envelope_fields - message_keys
         if unexpected:
             raise ValueError(
                 f"A2UI message contains unsupported top-level fields: {sorted(unexpected)}"
             )
-        if message_type == "actionResponse" and not value.get("actionId"):
-            raise ValueError("A2UI v1.0 actionResponse requires actionId")
-        if message_type == "callFunction" and not value.get("functionCallId"):
-            raise ValueError("A2UI v1.0 callFunction requires functionCallId")
         return dict(value)
 
     @property
@@ -134,13 +126,6 @@ class A2UIActionRequest(BaseModel):
     # a2uiRendererDataModel metadata; it is never serialized inside ``action``.
     data_model: dict[str, Any] = Field(default_factory=dict)
 
-    @model_validator(mode="after")
-    def validate_response_contract(self) -> A2UIActionRequest:
-        """Require the v1.0 action correlation id when a response is requested."""
-
-        if self.want_response and self.action_id is None:
-            raise ValueError("A2UI v1.0 actionId is required when wantResponse is true")
-        return self
 
 
 class A2UIActionBinding(BaseModel):

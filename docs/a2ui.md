@@ -66,4 +66,4 @@ The A2UI model includes renderer capabilities and negotiated capabilities. Negot
 
 ## A2A bidirectional binding
 
-The A2A binding carries renderer-to-agent A2UI v1.0 `action` messages as `application/a2ui+json` DataParts. Renderer state requested by `sendDataModel` is carried separately as `a2uiRendererDataModel` message metadata. v1.0 correlated actions use `wantResponse` plus `actionId`; agent responses use `actionResponse`. Agent-initiated renderer RPC uses `callFunction`, with renderer replies using `functionResponse`.
+The A2A binding carries renderer-to-agent A2UI v1.0 `action` messages as `application/a2ui+json` DataParts. Renderer state requested by `sendDataModel` is carried separately as `a2uiRendererDataModel` message metadata. v1.0 actions use the standard `action` envelope. Bidirectional RPC uses `callAgentFunction` / `agentFunctionResponse` and `callRendererFunction` / `rendererFunctionResponse` as defined by the v1.0 schemas.

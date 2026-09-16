@@ -41,9 +41,6 @@ def create_a2ui_action_part(action: A2UIActionRequest) -> Part:
         "timestamp": action.timestamp.isoformat().replace("+00:00", "Z"),
         "context": dict(action.context),
     }
-    if action.want_response:
-        payload["wantResponse"] = True
-        payload["actionId"] = action.action_id
     document = {"version": action.version, "action": payload}
     metadata = ParseDict({"mimeType": A2UI_MIME_TYPE}, Struct())
     return Part(data=ParseDict([document], Value()), metadata=metadata)
@@ -74,8 +71,6 @@ def parse_a2ui_action_part(part: Part) -> A2UIActionRequest | None:
             source_component_id=payload.get("sourceComponentId"),
             timestamp=payload.get("timestamp"),
             context=dict(payload.get("context") or {}),
-            want_response=bool(payload.get("wantResponse", False)),
-            action_id=payload.get("actionId"),
         )
     except (TypeError, ValueError) as exc:
         raise ConfigurationError("A2UI renderer action is invalid") from exc

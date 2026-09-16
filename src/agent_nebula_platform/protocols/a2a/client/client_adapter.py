@@ -236,11 +236,11 @@ class A2AClientAdapter:
         source_component_id: str,
         context: Mapping[str, Any] | None = None,
         data_model: Mapping[str, Any] | None = None,
-        want_response: bool = False,
-        action_id: str | None = None,
         context_id: str | None = None,
         task_id: str | None = None,
         skill_id: str | None = None,
+        want_response: bool = False,
+        action_id: str | None = None,
     ) -> tuple[dict[str, Any], ...]:
         """Send one A2UI v1.0 renderer action over the standard A2A binding."""
 

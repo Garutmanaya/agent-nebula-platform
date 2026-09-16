@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from datetime import datetime, timezone
 import pytest
 
 from agent_nebula_platform.a2ui import (
@@ -116,3 +117,19 @@ async def test_action_dispatch_uses_existing_skill_boundary() -> None:
     )
 
     assert result.data == {"received": {"flight_id": "F100"}}
+
+
+def test_action_request_preserves_response_options() -> None:
+    """A2UI action response options survive the transport-neutral model boundary."""
+
+    action = A2UIActionRequest(
+        name="parking.space.hold",
+        surface_id="parking-main",
+        source_component_id="L1-A-01",
+        timestamp=datetime.now(timezone.utc),
+        want_response=True,
+        action_id="action-123",
+    )
+
+    assert action.want_response is True
+    assert action.action_id == "action-123"
