@@ -157,6 +157,49 @@ def test_surface_rejects_mixed_versions_and_unapproved_catalog() -> None:
         _service().data_part(_surface(catalog_id="urn:untrusted"))
 
 
+def test_surface_accepts_v1_dynamic_child_list_template() -> None:
+    """A2UI v1.0 ChildList templates contribute their componentId reference."""
+
+    surface = _surface(
+        components=[
+            {
+                "id": "root",
+                "component": "Column",
+                "children": {
+                    "componentId": "result_template",
+                    "path": "/items",
+                },
+            },
+            {
+                "id": "result_template",
+                "component": "Button",
+                "text": "Select",
+                "action": {"event": {"name": "submit"}},
+            },
+        ]
+    )
+
+    _service().data_part(surface)
+
+
+def test_surface_rejects_invalid_v1_dynamic_child_list_template() -> None:
+    """Dynamic ChildList templates require both componentId and data path."""
+
+    surface = _surface(
+        components=[
+            {
+                "id": "root",
+                "component": "Column",
+                "children": {"componentId": "result_template"},
+            },
+            {"id": "result_template", "component": "Button", "text": "Select"},
+        ]
+    )
+
+    with pytest.raises(ConfigurationError, match="requires componentId and path"):
+        _service().data_part(surface)
+
+
 def test_surface_rejects_unresolved_component_references() -> None:
     """Renderer references must resolve within the complete surface stream."""
 

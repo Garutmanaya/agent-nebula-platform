@@ -253,6 +253,24 @@ class A2UIComponentPolicy:
                         f"A2UI component reference field '{key}' must contain ids"
                     )
                 references.update(nested)
+            elif key == "children" and isinstance(nested, Mapping):
+                # A2UI v1.0 ChildList supports a dynamic template form:
+                # {"componentId": "template-id", "path": "/items"}.  The
+                # template component remains a structural reference even though
+                # the renderer expands it once per item at the bound data path.
+                component_id = nested.get("componentId")
+                path = nested.get("path")
+                if (
+                    not isinstance(component_id, str)
+                    or not component_id
+                    or not isinstance(path, str)
+                    or not path
+                ):
+                    raise ConfigurationError(
+                        "A2UI component reference field 'children' template "
+                        "requires componentId and path"
+                    )
+                references.add(component_id)
             else:
                 raise ConfigurationError(
                     f"A2UI component reference field '{key}' has an invalid value"
