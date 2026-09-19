@@ -128,15 +128,6 @@ class A2UIActionRequest(BaseModel):
 
 
 
-class A2UIActionBinding(BaseModel):
-    """Bind one renderer event name to an existing runtime skill."""
-
-    model_config = ConfigDict(extra="forbid", frozen=True)
-
-    action_name: str = Field(min_length=1, max_length=200)
-    skill_id: str = Field(min_length=1, max_length=200)
-
-
 class A2UIRendererCapabilities(BaseModel):
     """Describe the A2UI versions and catalog features a renderer accepts."""
 

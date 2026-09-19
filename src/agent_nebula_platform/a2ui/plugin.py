@@ -2,12 +2,11 @@
 
 from __future__ import annotations
 
-from collections.abc import Iterable, Sequence
+from collections.abc import Sequence
 
 from agent_nebula_platform.a2ui.models import (
     A2UI_STABLE_VERSION,
     A2UI_SUPPORTED_VERSIONS,
-    A2UIActionBinding,
 )
 from agent_nebula_platform.a2ui.service import A2UIService
 from agent_nebula_platform.a2ui.validation import (
@@ -16,7 +15,6 @@ from agent_nebula_platform.a2ui.validation import (
 )
 from agent_nebula_platform.platform.context import RuntimeContext
 from agent_nebula_platform.platform.plugins.base import RuntimePlugin
-from agent_nebula_platform.skills import SkillInvocationService, SkillRegistry
 
 
 class A2UIPlugin(RuntimePlugin):
@@ -30,7 +28,6 @@ class A2UIPlugin(RuntimePlugin):
         allowed_catalog_ids: Sequence[str] = (),
         supported_versions: Sequence[str] = A2UI_SUPPORTED_VERSIONS,
         preferred_version: str = A2UI_STABLE_VERSION,
-        action_bindings: Iterable[A2UIActionBinding] = (),
         required: bool = True,
     ) -> None:
         self._component_policy = A2UIComponentPolicy(
@@ -42,7 +39,6 @@ class A2UIPlugin(RuntimePlugin):
             preferred_version=preferred_version,
             allowed_catalog_ids=allowed_catalog_ids,
         )
-        self._bindings = tuple(action_bindings)
         self._required = required
 
     @property
@@ -58,21 +54,17 @@ class A2UIPlugin(RuntimePlugin):
         return self._required
 
     async def initialize(self, context: RuntimeContext) -> None:
-        """Validate bindings and register the A2UI service."""
+        """Register A2UI validation/capability services.
 
-        invocation = context.services.require(
-            "skills.invocation", SkillInvocationService
-        )
-        registry = context.services.require("skills.registry", SkillRegistry)
-        for binding in self._bindings:
-            registry.require(binding.skill_id)
+        Renderer events are transported by the A2UI A2A extension and are not
+        mapped to AgentSkill identifiers by the runtime.
+        """
+
         context.services.register(
             self.name,
             A2UIService(
                 component_policy=self._component_policy,
                 protocol_policy=self._protocol_policy,
-                invocation_service=invocation,
-                action_bindings=self._bindings,
             ),
         )
 

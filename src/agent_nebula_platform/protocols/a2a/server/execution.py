@@ -29,6 +29,10 @@ type A2ABusinessHandler = Callable[
     [Mapping[str, object]],
     A2ABusinessResult | Awaitable[A2ABusinessResult],
 ]
+type A2UIActionHandler = Callable[
+    [A2UIActionRequest, Mapping[str, object]],
+    A2ABusinessResult | Awaitable[A2ABusinessResult],
+]
 
 class A2AExecutableSkill(Protocol):
     """Minimal skill contract required by the A2A execution adapter."""
@@ -58,6 +62,7 @@ class A2AAgentExecutor(AgentExecutor):
         *,
         result_mapper: A2AResultMapper | None = None,
         protocol_tracer: A2AProtocolTracer | None = None,
+        a2ui_action_handler: A2UIActionHandler | None = None,
     ) -> None:
         """Bind executable skills by their stable advertised identifiers."""
 
@@ -65,6 +70,7 @@ class A2AAgentExecutor(AgentExecutor):
             raise ConfigurationError("A2A AgentExecutor requires at least one skill")
         self._skills = {skill.skill_id: skill for skill in skills}
         self._protocol_tracer = protocol_tracer or create_protocol_tracer_from_environment()
+        self._a2ui_action_handler = a2ui_action_handler
         self._result_mapper = result_mapper or A2AResultMapper(
             protocol_tracer=self._protocol_tracer
         )
@@ -72,43 +78,93 @@ class A2AAgentExecutor(AgentExecutor):
             raise ConfigurationError("A2A AgentExecutor skill identifiers must be unique")
 
     async def execute(self, context: RequestContext, event_queue: EventQueue) -> None:
-        """Translate an A2A message into the generic business-handler payload."""
+        """Classify the A2A message before dispatching protocol-specific behavior.
+
+        A2UI renderer actions are A2UI protocol messages transported inside an
+        official A2A DataPart. They are not AgentSkill invocations and therefore
+        must never pass through the Nebula skill-selection extension.
+        """
 
         message = context.message
         self._trace_incoming_request(message)
+        a2ui_action, payload = self._parse_message(message)
+        if a2ui_action is not None:
+            await self._execute_a2ui_action(
+                action=a2ui_action,
+                payload=payload,
+                event_queue=event_queue,
+            )
+            return
+        await self._execute_skill(
+            context=context,
+            payload=payload,
+            event_queue=event_queue,
+        )
+
+    def _parse_message(
+        self, message: object | None
+    ) -> tuple[A2UIActionRequest | None, dict[str, object]]:
+        """Separate A2UI renderer actions from ordinary A2A business payloads."""
+
         text = get_message_text(message, delimiter=" ") if message is not None else ""
         payload: dict[str, object] = {"message": text}
-        if message is not None:
-            a2ui_action: A2UIActionRequest | None = None
-            for part in message.parts:
-                parsed_action = parse_a2ui_action_part(part)
-                if parsed_action is not None:
-                    if a2ui_action is not None:
-                        raise ConfigurationError("A2A message may contain only one A2UI action")
-                    a2ui_action = parsed_action
-                    continue
-                if part.HasField("data"):
-                    data = MessageToDict(part.data)
-                    if isinstance(data, dict):
-                        payload.update(data)
-            if a2ui_action is not None:
-                payload["a2ui_action"] = {
-                    "version": a2ui_action.version,
-                    "name": a2ui_action.name,
-                    "surface_id": a2ui_action.surface_id,
-                    "source_component_id": a2ui_action.source_component_id,
-                    "timestamp": a2ui_action.timestamp.isoformat(),
-                    "context": dict(a2ui_action.context),
-                    "want_response": a2ui_action.want_response,
-                    "action_id": a2ui_action.action_id,
-                }
-                metadata = MessageToDict(message.metadata) if message.HasField("metadata") else {}
-                renderer_model = metadata.get("a2uiRendererDataModel")
-                if isinstance(renderer_model, dict):
-                    payload["a2ui_renderer_data_model"] = renderer_model
-        # NEBULA A2A EXTENSION: selection is made by the client and carried in
-        # standards-compliant SendMessageRequest.metadata. For a single-skill
-        # provider the extension remains optional for generic A2A interoperability.
+        if message is None:
+            return None, payload
+
+        a2ui_action: A2UIActionRequest | None = None
+        for part in message.parts:
+            parsed_action = parse_a2ui_action_part(part)
+            if parsed_action is not None:
+                if a2ui_action is not None:
+                    raise ConfigurationError("A2A message may contain only one A2UI action")
+                a2ui_action = parsed_action
+                continue
+            if part.HasField("data"):
+                data = MessageToDict(part.data)
+                if isinstance(data, dict):
+                    payload.update(data)
+
+        if a2ui_action is not None:
+            metadata = MessageToDict(message.metadata) if message.HasField("metadata") else {}
+            renderer_model = metadata.get("a2uiRendererDataModel")
+            if isinstance(renderer_model, dict):
+                payload["a2ui_renderer_data_model"] = renderer_model
+        return a2ui_action, payload
+
+    async def _execute_a2ui_action(
+        self,
+        *,
+        action: A2UIActionRequest,
+        payload: Mapping[str, object],
+        event_queue: EventQueue,
+    ) -> None:
+        """Dispatch one A2UI event without applying A2A AgentSkill selection."""
+
+        if self._a2ui_action_handler is None:
+            raise ConfigurationError(
+                "A2UI renderer action received but no A2UI action handler is configured"
+            )
+        result = self._a2ui_action_handler(action, payload)
+        if inspect.isawaitable(result):
+            result = await result
+        if not isinstance(result, (Mapping, SkillResult)):
+            raise ConfigurationError(
+                "A2UI action handler must return a mapping/dict or SkillResult"
+            )
+        await event_queue.enqueue_event(self._result_mapper.map(result))
+
+    async def _execute_skill(
+        self,
+        *,
+        context: RequestContext,
+        payload: Mapping[str, object],
+        event_queue: EventQueue,
+    ) -> None:
+        """Dispatch an ordinary A2A business message to its selected AgentSkill."""
+
+        # NEBULA A2A EXTENSION: skill selection applies only to ordinary A2A
+        # business invocation. A2UI renderer events are classified and dispatched
+        # before this boundary.
         from agent_nebula_platform.protocols.a2a.extensions import selected_skill_id
 
         skill_id = selected_skill_id(

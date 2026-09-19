@@ -75,19 +75,26 @@ class A2UIProtocolPolicy:
                 f"A2UI message version is not supported by this runtime: {version}"
             )
         if self._catalog_ids:
+            # Catalog selection is established by createSurface. Incremental
+            # A2UI v1.0 responses may contain only updates for an existing
+            # surface, in which case there is no catalog declaration to check.
             create = next(
-                message
-                for message in surface.messages
-                if message.message_type == "createSurface"
+                (
+                    message
+                    for message in surface.messages
+                    if message.message_type == "createSurface"
+                ),
+                None,
             )
-            payload = create.document["createSurface"]
-            catalog_id = (
-                payload.get("catalogId") if isinstance(payload, Mapping) else None
-            )
-            if catalog_id not in self._catalog_ids:
-                raise ConfigurationError(
-                    f"A2UI catalog is not approved by policy: {catalog_id}"
+            if create is not None:
+                payload = create.document["createSurface"]
+                catalog_id = (
+                    payload.get("catalogId") if isinstance(payload, Mapping) else None
                 )
+                if catalog_id not in self._catalog_ids:
+                    raise ConfigurationError(
+                        f"A2UI catalog is not approved by policy: {catalog_id}"
+                    )
         return version
 
     def validate_action(self, action: A2UIActionRequest) -> None:
@@ -145,6 +152,9 @@ class A2UIComponentPolicy:
 
         created = False
         deleted = False
+        incremental = bool(surface.messages) and (
+            surface.messages[0].message_type != "createSurface"
+        )
         component_ids: set[str] = set()
         references: set[str] = set()
         action_names: set[str] = set()
@@ -160,11 +170,13 @@ class A2UIComponentPolicy:
                 raise ConfigurationError("A2UI message targets a different surface")
 
             if message.message_type == "createSurface":
+                if incremental:
+                    raise ConfigurationError(
+                        "A2UI createSurface must be the first message in a new surface stream"
+                    )
                 if created or deleted:
                     raise ConfigurationError("A2UI surface may be created only once")
                 created = True
-            elif not created:
-                raise ConfigurationError("A2UI surface must be created before updates")
 
             if message.message_type == "deleteSurface":
                 deleted = True
@@ -186,10 +198,10 @@ class A2UIComponentPolicy:
                         "A2UI updateComponents requires a component list"
                     )
 
-        if not created:
-            raise ConfigurationError("A2UI surface is missing createSurface")
-
-        missing = sorted(references - component_ids)
+        # For a newly-created surface all component references must resolve
+        # within the supplied stream. Incremental updates may legitimately
+        # reference components that already exist in renderer state.
+        missing = sorted(references - component_ids) if created else []
         if missing:
             raise ConfigurationError(
                 f"A2UI component references are unresolved: {missing}"

@@ -10,6 +10,7 @@ from agent_nebula_platform.a2ui import (
     A2UIActionRequest,
     A2UIComponentPolicy,
     A2UIMessage,
+    A2UIProtocolPolicy,
     A2UIService,
     A2UISurface,
 )
@@ -84,6 +85,34 @@ def test_surface_rejects_unapproved_component_and_executable_content() -> None:
     )
     with pytest.raises(ConfigurationError, match="prohibited executable"):
         policy.validate_surface(unsafe)
+
+
+def test_surface_validation_accepts_incremental_update_without_create() -> None:
+    """A2UI v1.0 updates may target an already-created renderer surface."""
+
+    surface = A2UISurface(
+        surface_id="main",
+        messages=(
+            A2UIMessage(
+                document={
+                    "version": "v1.0",
+                    "updateDataModel": {
+                        "surfaceId": "main",
+                        "path": "/selectedSeat",
+                        "value": "17A",
+                    },
+                }
+            ),
+        ),
+    )
+
+    protocol = A2UIProtocolPolicy(
+        allowed_catalog_ids=("urn:agent-nebula:a2ui:basic",)
+    )
+    components = A2UIComponentPolicy(allowed_components=("Text",))
+
+    assert protocol.validate_surface(surface) == "v1.0"
+    assert components.validate_surface(surface) == ()
 
 
 @pytest.mark.asyncio

@@ -207,25 +207,5 @@ class FastApiRuntimeAdapter:
                     raise _http_error(exc) from exc
                 return negotiated.model_dump(mode="json")
 
-            @router.post(f"{self._api_prefix}/a2ui/actions")
-            async def a2ui_action(
-                request: Request,
-                body: A2UIActionRequest,
-                authorization: str | None = Header(default=None),
-                dpop: str | None = Header(default=None, alias="DPoP"),
-            ) -> dict[str, Any]:
-                """Dispatch a renderer event through the owning agent skill."""
-
-                try:
-                    result = await self._a2ui.dispatch_action(
-                        action=body,
-                        access_token=_bearer_token(authorization),
-                        dpop_proof=dpop,
-                        http_method=request.method,
-                        target_uri=self._request_target.resolve(request),
-                    )
-                except AgentRuntimeError as exc:
-                    raise _http_error(exc) from exc
-                return _result_document(result, self._a2ui)
 
         return router

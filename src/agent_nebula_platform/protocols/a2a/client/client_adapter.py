@@ -238,7 +238,6 @@ class A2AClientAdapter:
         data_model: Mapping[str, Any] | None = None,
         context_id: str | None = None,
         task_id: str | None = None,
-        skill_id: str | None = None,
         want_response: bool = False,
         action_id: str | None = None,
     ) -> tuple[dict[str, Any], ...]:
@@ -250,7 +249,7 @@ class A2AClientAdapter:
             for extension in card.capabilities.extensions
         ):
             raise ConfigurationError("Remote A2A agent does not advertise A2UI v1.0")
-        extension_context = self._extension_context_builder.build(card, skill_id=skill_id)
+        extension_context = self._extension_context_builder.build(card)
         action = A2UIActionRequest(
             version=A2UI_STABLE_VERSION,
             name=name,
@@ -289,10 +288,10 @@ class A2AClientAdapter:
         self._trace_outgoing_request(
             request_document,
             card=card,
-            skill_id=skill_id,
+            skill_id=None,
             operation="SendMessage",
         )
-        client = self.create(card, skill_id=skill_id)
+        client = self.create(card)
         responses: list[dict[str, Any]] = []
         try:
             async for response in client.send_message(

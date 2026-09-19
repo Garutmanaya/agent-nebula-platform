@@ -13,7 +13,6 @@ from fastapi import FastAPI
 from agent_nebula_platform.a2ui import (
     A2UI_STABLE_VERSION,
     A2UI_SUPPORTED_VERSIONS,
-    A2UIActionBinding,
 )
 from agent_nebula_platform.a2ui.actions import A2UIActionDispatcher
 from agent_nebula_platform.a2ui.session import A2UISessionService
@@ -92,7 +91,6 @@ class RuntimeFeatureComponents:
     a2ui_allowed_catalog_ids: tuple[str, ...] = ()
     a2ui_supported_versions: tuple[str, ...] = A2UI_SUPPORTED_VERSIONS
     a2ui_preferred_version: str = A2UI_STABLE_VERSION
-    a2ui_action_bindings: tuple[A2UIActionBinding, ...] = ()
     a2ui_session: A2UISessionService | None = None
     a2ui_action_dispatcher: A2UIActionDispatcher | None = None
     metrics_registry: MetricsRegistry | None = None
@@ -122,7 +120,6 @@ class RuntimeFeatureComponents:
         a2ui_allowed_catalog_ids: Sequence[str] = (),
         a2ui_supported_versions: Sequence[str] = A2UI_SUPPORTED_VERSIONS,
         a2ui_preferred_version: str = A2UI_STABLE_VERSION,
-        a2ui_action_bindings: Iterable[A2UIActionBinding] = (),
         a2ui_session: A2UISessionService | None = None,
         a2ui_action_dispatcher: A2UIActionDispatcher | None = None,
         metrics_registry: MetricsRegistry | None = None,
@@ -151,7 +148,6 @@ class RuntimeFeatureComponents:
             a2ui_allowed_catalog_ids=tuple(a2ui_allowed_catalog_ids),
             a2ui_supported_versions=tuple(a2ui_supported_versions),
             a2ui_preferred_version=a2ui_preferred_version,
-            a2ui_action_bindings=tuple(a2ui_action_bindings),
             a2ui_session=a2ui_session,
             a2ui_action_dispatcher=a2ui_action_dispatcher,
             metrics_registry=metrics_registry,

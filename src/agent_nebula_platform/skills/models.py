@@ -45,3 +45,6 @@ class SkillDefinition(BaseModel):
     required_scopes: tuple[str, ...] = ()
     handler: SkillHandler
     description: str | None = None
+    schema_contract_id: str | None = None
+    input_schema: dict[str, Any] | None = None
+    output_schema: dict[str, Any] | None = None

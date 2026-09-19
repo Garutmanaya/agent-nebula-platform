@@ -43,6 +43,7 @@ from agent_nebula_platform.platform.presets.standalone.settings import (
 from agent_nebula_platform.protocols.a2a.extensions.a2ui import ensure_a2ui_extension
 from agent_nebula_platform.protocols.a2a.extensions import (
     ensure_health_extension,
+    ensure_schema_contract_extension,
     ensure_skill_selection_extension,
     validate_executable_skills,
 )
@@ -59,6 +60,7 @@ from agent_nebula_platform.protocols.a2a.server.configuration.listener import (
 from agent_nebula_platform.protocols.a2a.server.execution import (
     A2AAgentExecutor,
     A2AExecutableSkill,
+    A2UIActionHandler,
 )
 
 
@@ -122,6 +124,7 @@ class A2AStandaloneApplicationComposer:
         skills: tuple[A2AExecutableSkill, ...] = (),
         nebula_config: Path | None = None,
         a2ui: A2UIConfiguration | None = None,
+        a2ui_action_handler: A2UIActionHandler | None = None,
     ) -> A2AStandaloneApplication:
         """Build a standalone A2A application without developer-facade logic."""
 
@@ -140,6 +143,10 @@ class A2AStandaloneApplicationComposer:
         # ordinary messages without activating Agent Nebula extension metadata.
         ensure_skill_selection_extension(card, required=False)
 
+        # A2A Schema Contract Draft 0.1 uses the standard A2A 1.0 extension
+        # mechanism; it does not add fields to AgentSkill or other core models.
+        ensure_schema_contract_extension(card, executable_skills)
+
         # NEBULA A2A EXTENSION: operational health is independently configured
         # and advertised. It never changes A2A invocation semantics.
         if health_endpoints is not None:
@@ -157,7 +164,10 @@ class A2AStandaloneApplicationComposer:
 
         listener = A2AListenerConfigurationLoader().load(server_config)
         handler = DefaultRequestHandler(
-            agent_executor=A2AAgentExecutor(executable_skills),
+            agent_executor=A2AAgentExecutor(
+                executable_skills,
+                a2ui_action_handler=a2ui_action_handler,
+            ),
             task_store=InMemoryTaskStore(),
             agent_card=card,
         )

@@ -8,7 +8,7 @@ from .configuration import (
     A2AServerConfigurationLoader,
     A2AServerConfigurationService,
 )
-from .execution import A2AAgentExecutor, A2AExecutableSkill
+from .execution import A2AAgentExecutor, A2AExecutableSkill, A2UIActionHandler
 from .plugin import A2AServerPlugin
 from .server_adapter import A2AServerAdapter
 from .server_interfaces import A2AServerInterfacePlan, A2AServerInterfacePlanner
@@ -18,6 +18,7 @@ __all__ = [
     "A2AAgentCardValidator",
     "A2AAgentExecutor",
     "A2AExecutableSkill",
+    "A2UIActionHandler",
     "A2AListenerConfiguration",
     "A2AListenerConfigurationLoader",
     "A2AServerAdapter",

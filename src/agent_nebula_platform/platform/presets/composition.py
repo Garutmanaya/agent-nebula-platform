@@ -223,7 +223,6 @@ def compose_feature_plugins(
                 allowed_catalog_ids=components.a2ui_allowed_catalog_ids,
                 supported_versions=components.a2ui_supported_versions,
                 preferred_version=components.a2ui_preferred_version,
-                action_bindings=components.a2ui_action_bindings,
             )
         )
 
