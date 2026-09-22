@@ -28,6 +28,7 @@ from .platform.execution_trace import (
     reset_execution_trace,
 )
 from .platform.health import HealthStatus, RuntimeHealthService
+from .platform.llm import LlmCostEstimator, LlmUsageObserver, LlmUsageRecord
 from .platform.metrics import MetricsRegistry, MetricsSnapshot
 from .platform.runtime import AgentRuntime
 from .platform.scheduler import JobTriggerType, RuntimeScheduler, ScheduledJob
@@ -50,6 +51,9 @@ __all__ = [
     "JobTriggerType",
     "JsonFileStateStore",
     "MemoryStateStore",
+    "LlmCostEstimator",
+    "LlmUsageObserver",
+    "LlmUsageRecord",
     "MetricsRegistry",
     "MetricsSnapshot",
     "NullEventSink",

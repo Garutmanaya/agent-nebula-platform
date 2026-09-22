@@ -8,7 +8,7 @@ host application to keep its existing logging policy.
 from __future__ import annotations
 
 import logging
-
+from agent_nebula_platform.observability.logging import configure_console_logger
 from agent_nebula_platform.platform.events import PythonLoggingEventSink
 
 
@@ -24,13 +24,5 @@ def create_console_event_sink(
     tests or by a development reloader.
     """
 
-    logger = logging.getLogger(logger_name)
-    logger.setLevel(level)
-    logger.propagate = False
-    if not logger.handlers:
-        handler = logging.StreamHandler()
-        handler.setFormatter(
-            logging.Formatter("%(asctime)s | %(levelname)s | %(name)s | %(message)s")
-        )
-        logger.addHandler(handler)
+    logger = configure_console_logger(logger_name=logger_name, level=level)
     return PythonLoggingEventSink(logger)

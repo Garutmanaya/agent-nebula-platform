@@ -13,6 +13,8 @@ import logging
 import os
 from typing import Protocol
 
+from agent_nebula_platform.observability.logging import create_utc_formatter
+
 from .events import A2AProtocolTraceEvent
 from .redaction import redact_protocol_value
 
@@ -76,7 +78,9 @@ class LoggingA2AProtocolTracer:
 
         if any(isinstance(handler, _A2AProtocolTraceHandler) for handler in self._logger.handlers):
             return
-        self._logger.addHandler(_A2AProtocolTraceHandler())
+        handler = _A2AProtocolTraceHandler()
+        handler.setFormatter(create_utc_formatter())
+        self._logger.addHandler(handler)
 
     @property
     def include_payloads(self) -> bool:

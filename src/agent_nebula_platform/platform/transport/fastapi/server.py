@@ -75,6 +75,8 @@ class UvicornServerSettings:
     private_key_file: Path | None = None
     trust_bundle_file: Path | None = None
     readiness_timeout_seconds: float = 30.0
+    console_logging: bool = True
+    log_level: str = "INFO"
 
 
 class UvicornRuntimeServer:
@@ -125,10 +127,58 @@ class UvicornRuntimeServer:
         if self._settings.trust_bundle_file is not None:
             tls_options["ssl_ca_certs"] = str(self._settings.trust_bundle_file)
 
+        log_config = None
+        if self._settings.console_logging:
+            from agent_nebula_platform.observability.logging import (
+                DATE_FORMAT,
+                LOG_FORMAT,
+                UTCFormatter,
+            )
+
+            # Uvicorn owns separate error/access loggers.  Supply the same UTC
+            # timestamped format used by Platform instead of Uvicorn's default
+            # formatter, which omits timestamps from access records.
+            log_config = {
+                "version": 1,
+                "disable_existing_loggers": False,
+                "formatters": {
+                    "platform": {
+                        "()": UTCFormatter,
+                        "format": LOG_FORMAT,
+                        "datefmt": DATE_FORMAT,
+                    },
+                    "access": {
+                        "()": UTCFormatter,
+                        "format": LOG_FORMAT,
+                        "datefmt": DATE_FORMAT,
+                    },
+                },
+                "handlers": {
+                    "default": {
+                        "formatter": "platform",
+                        "class": "logging.StreamHandler",
+                        "stream": "ext://sys.stderr",
+                    },
+                    "access": {
+                        "formatter": "access",
+                        "class": "logging.StreamHandler",
+                        "stream": "ext://sys.stdout",
+                    },
+                },
+                "loggers": {
+                    "uvicorn": {"handlers": ["default"], "level": self._settings.log_level, "propagate": False},
+                    "uvicorn.error": {"level": self._settings.log_level},
+                    "uvicorn.access": {"handlers": ["access"], "level": self._settings.log_level, "propagate": False},
+                },
+            }
+
         config = uvicorn.Config(
             self._app,
             host=self._settings.host,
             port=self._settings.port,
+            log_level=self._settings.log_level.lower(),
+            log_config=log_config,
+            access_log=self._settings.console_logging,
             **tls_options,
         )
 

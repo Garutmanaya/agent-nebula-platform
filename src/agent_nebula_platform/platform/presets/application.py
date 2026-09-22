@@ -457,6 +457,8 @@ class RuntimeApplication:
                 port=server.port,
                 certificate_file=server.ssl_certificate_file,
                 private_key_file=server.ssl_private_key_file,
+                console_logging=self.services.settings.runtime.logging.console_enabled,
+                log_level=self.services.settings.runtime.logging.level,
             ),
         ).run()
 

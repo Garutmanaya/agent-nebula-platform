@@ -210,7 +210,11 @@ class A2AStandaloneApplicationComposer:
             ),
             nebula=nebula_settings,
             state=StandaloneStateSettings(directory=application.runtime_root / "state"),
-            logging=StandaloneLoggingSettings(logger_name="agent_nebula_platform"),
+            logging=StandaloneLoggingSettings(
+                console_enabled=application.console_logging,
+                logger_name="agent_nebula_platform",
+                level=application.log_level,
+            ),
             plugins=StandalonePluginSettings(
                 onboarding=bool(nebula and nebula.registration.enabled),
                 oauth_client=False,
@@ -222,8 +226,8 @@ class A2AStandaloneApplicationComposer:
                 a2a=True,
                 a2ui=False,
                 a2ui_session=False,
-                metrics=False,
-                telemetry=False,
+                metrics=application.metrics,
+                telemetry=application.telemetry,
                 scheduler=False,
             ),
         )
