@@ -9,6 +9,7 @@ from __future__ import annotations
 from typing import Any
 
 from .actions import A2UIActionDispatcher
+from .composition import A2UIComposer, A2UIPresentation
 from .configuration import A2UIConfiguration
 from .data_model import A2UIDataModelService
 from .events import A2UISessionEvent
@@ -47,11 +48,13 @@ __all__ = [
     "A2UIActionRequest",
     "A2UICapabilities",
     "A2UIComponentPolicy",
+    "A2UIComposer",
     "A2UIConfiguration",
     "A2UIDataModelService",
     "A2UIDataPart",
     "A2UIMessage",
     "A2UINegotiatedCapabilities",
+    "A2UIPresentation",
     "A2UIProtocolPolicy",
     "A2UIRendererCapabilities",
     "A2UIService",

@@ -26,6 +26,7 @@ class A2UIConfiguration(BaseModel):
     enabled: bool = False
     version: str = A2UI_STABLE_VERSION
     supported_catalog_ids: tuple[str, ...] = ()
+    default_catalog_id: str | None = None
     accepts_inline_catalogs: bool = False
 
     @model_validator(mode="after")
@@ -37,6 +38,13 @@ class A2UIConfiguration(BaseModel):
                 f"Unsupported A2UI version {self.version!r}; "
                 f"supported versions: {', '.join(A2UI_SUPPORTED_VERSIONS)}"
             )
+        if self.default_catalog_id is not None:
+            if not self.default_catalog_id.strip():
+                raise ValueError("A2UI default catalog id must not be empty")
+            if self.default_catalog_id not in self.supported_catalog_ids:
+                raise ValueError(
+                    "A2UI default catalog id must be included in supported catalog ids"
+                )
         return self
 
     @classmethod
@@ -62,6 +70,7 @@ class A2UIConfiguration(BaseModel):
             "enabled",
             "version",
             "supported_catalog_ids",
+            "default_catalog_id",
             "accepts_inline_catalogs",
         }
         unknown = set(section) - known
@@ -89,6 +98,9 @@ class A2UIConfiguration(BaseModel):
                 enabled=enabled,
                 version=section.get("version", fallback=A2UI_STABLE_VERSION).strip(),
                 supported_catalog_ids=catalogs,
+                default_catalog_id=(
+                    section.get("default_catalog_id", fallback="").strip() or None
+                ),
                 accepts_inline_catalogs=accepts_inline_catalogs,
             )
         except ValueError as exc:

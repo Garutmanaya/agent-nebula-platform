@@ -5,4 +5,7 @@ enabled = true
 version = v1.0
 # Comma-separated A2UI catalog identifiers advertised through AgentExtension.params.
 supported_catalog_ids =
+# Optional when exactly one catalog is configured; required for an unambiguous
+# default when multiple catalogs are available to provider presentations.
+default_catalog_id =
 accepts_inline_catalogs = false
