@@ -24,11 +24,12 @@ from .discovered_oauth import A2ADiscoveredOAuth2CredentialProvider
 
 
 class A2AClientServiceFactory:
-    """Create fully secured Platform A2A clients from external configuration.
+    """Compose the native ``a2a-sdk`` client environment from configuration.
 
-    The factory is the composition boundary between Step 4 transport configuration
-    and Step 5 security negotiation.  Callers do not need to know about individual
-    A2A credential-provider classes.
+    AGENT NEBULA INTEGRATION:
+    This factory owns only Nebula-added configuration and security composition.
+    ``A2AClientAdapter.connect`` ultimately returns the official SDK ``Client``;
+    standard A2A operations are never mirrored by this service.
     """
 
     def __init__(self, loader: A2AClientConfigurationLoader | None = None) -> None:

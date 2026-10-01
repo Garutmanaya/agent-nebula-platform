@@ -93,16 +93,6 @@ class A2AClientAdapter:
             return base_url, configured_path
         return location, configured_path
 
-    async def resolve_agent_card_document(self, base_url: str) -> dict[str, Any]:
-        """Resolve an Agent Card and return its protocol-neutral JSON representation.
-
-        Higher-level facades use this operation so they do not need to import
-        official A2A protobuf models or protobuf serialization utilities.
-        """
-
-        card = await self.resolve_agent_card(base_url)
-        return MessageToDict(card, preserving_proto_field_name=True)
-
     async def connect(
         self,
         base_url: str,
@@ -110,7 +100,13 @@ class A2AClientAdapter:
         interceptors: list[ClientCallInterceptor] | None = None,
         skill_id: str | None = None,
     ) -> Client:
-        """Resolve the remote card and create an official A2A client for it."""
+        """Resolve the remote card and return an official ``a2a-sdk`` client.
+
+        AGENT NEBULA INTEGRATION:
+        Platform supplies external configuration, TLS, security interceptors and
+        optional Nebula extension context. It does not wrap standard Client
+        operations; callers use the returned SDK client directly.
+        """
 
         card = await self.resolve_agent_card(base_url)
         if skill_id is not None:
@@ -124,7 +120,13 @@ class A2AClientAdapter:
         interceptors: list[ClientCallInterceptor] | None = None,
         skill_id: str | None = None,
     ) -> Client:
-        """Create an official client from an already resolved Agent Card."""
+        """Create and return an official client from a resolved Agent Card.
+
+        AGENT NEBULA INTEGRATION:
+        The only additions here are configuration and interceptors installed via
+        official ``a2a-sdk`` extension points. The returned object is the SDK's
+        native ``Client``.
+        """
 
         self._ensure_open()
         config = ClientConfig(

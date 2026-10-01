@@ -156,7 +156,13 @@ class A2AClientSecurityResolver:
 
 
 class A2AClientSecurityInterceptor(ClientCallInterceptor):
-    """Apply a complete negotiated A2A security requirement to every client call."""
+    """Apply Agent Nebula credentials through the official SDK interceptor API.
+
+    AGENT NEBULA SECURITY:
+    A2A advertises security requirements but credential acquisition is external
+    to the protocol. Agent Nebula implements that acquisition here and injects
+    credentials through ``ClientCallInterceptor`` without replacing SDK calls.
+    """
 
     def __init__(self, resolver: A2AClientSecurityResolver) -> None:
         self._resolver = resolver

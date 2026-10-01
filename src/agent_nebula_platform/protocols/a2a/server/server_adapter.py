@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-from collections.abc import Awaitable, Callable
 from pathlib import Path
 from typing import Any
 
@@ -13,13 +12,11 @@ from a2a.server.routes.rest_routes import create_rest_routes
 from a2a.types import AgentCard
 from a2a.utils.constants import TransportProtocol
 from fastapi import FastAPI
-from starlette.requests import Request
-from starlette.responses import JSONResponse, Response
-from starlette.routing import Mount, Route, request_response
 
 from agent_nebula_platform.platform.errors import ConfigurationError
 
-from ..security.security import A2ASecurityRequest, A2AServerSecurityService
+from ..security.context import A2ASecurityServerCallContextBuilder
+from ..security.security import A2AServerSecurityService
 from .configuration.listener import A2AServerTlsConfiguration
 from .server_interfaces import A2AServerInterfacePlan, A2AServerInterfacePlanner
 
@@ -84,6 +81,15 @@ class A2AServerAdapter:
     def _attach_http(self, plan: A2AServerInterfacePlan) -> None:
         """Mount official Agent Card, JSON-RPC, and HTTP+JSON routes."""
 
+        # AGENT NEBULA SECURITY: authenticate through the official a2a-sdk
+        # ServerCallContextBuilder extension point instead of wrapping or replacing
+        # SDK-generated protocol routes. Agent Card discovery remains public because
+        # the context builder is supplied only to A2A protocol route factories.
+        context_builder = (
+            A2ASecurityServerCallContextBuilder(self._security)
+            if self._security is not None
+            else None
+        )
         jsonrpc_routes = []
         rest_routes = []
         for interface in plan.http:
@@ -92,12 +98,14 @@ class A2AServerAdapter:
                     create_jsonrpc_routes(
                         request_handler=self._request_handler,
                         rpc_url=interface.path,
+                        context_builder=context_builder,
                     )
                 )
             elif interface.binding == TransportProtocol.HTTP_JSON:
                 rest_routes.extend(
                     create_rest_routes(
                         request_handler=self._request_handler,
+                        context_builder=context_builder,
                         path_prefix=interface.path.rstrip("/"),
                     )
                 )
@@ -105,69 +113,15 @@ class A2AServerAdapter:
         # server integration API.  Attach those routes directly to the
         # caller-owned FastAPI router instead of depending on the FastAPI
         # convenience helper introduced in a later SDK release.
-        routes = [
-            *create_agent_card_routes(
-                self._agent_card, card_url=self._agent_card_route
-            ),
-            *jsonrpc_routes,
-            *rest_routes,
-        ]
-        self._app.router.routes.extend(self._secure_http_routes(routes))
-
-    def _secure_http_routes(self, routes: list[Any]) -> list[Any]:
-        """Protect protocol routes while leaving public Agent Card discovery readable."""
-
-        if self._security is None or not self._security.required:
-            return routes
-        secured: list[Any] = []
-        for route in routes:
-            if (
-                isinstance(route, Route)
-                and route.path == self._agent_card_route
-            ):
-                secured.append(route)
-                continue
-            if isinstance(route, Route):
-                route.endpoint = self._secured_endpoint(route.endpoint)
-                # Starlette creates the ASGI app from endpoint during Route construction.
-                # Rebuild it after replacing the endpoint so enforcement cannot be bypassed.
-                route.app = request_response(route.endpoint)
-            elif isinstance(route, Mount):
-                route.routes[:] = self._secure_http_routes(list(route.routes))
-            secured.append(route)
-        return secured
-
-    def _secured_endpoint(
-        self, endpoint: Callable[[Request], Awaitable[Response]]
-    ) -> Callable[[Request], Awaitable[Response]]:
-        """Wrap one official HTTP endpoint with Agent Card security enforcement."""
-
-        async def secured(request: Request) -> Response:
-            assert self._security is not None
-            try:
-                principals = self._security.authenticate(
-                    A2ASecurityRequest(
-                        headers={
-                            key.lower(): value for key, value in request.headers.items()
-                        },
-                        http_method=request.method,
-                        target_uri=str(request.url),
-                    )
-                )
-            except (
-                Exception
-            ) as exc:  # Authentication implementations fail closed at HTTP boundary.
-                from agent_nebula_platform.platform.errors import AuthenticationError
-
-                if not isinstance(exc, AuthenticationError):
-                    raise
-                return JSONResponse(
-                    {"error": "unauthorized", "message": str(exc)}, status_code=401
-                )
-            request.scope["a2a.security"] = principals
-            return await endpoint(request)
-
-        return secured
+        self._app.router.routes.extend(
+            [
+                *create_agent_card_routes(
+                    self._agent_card, card_url=self._agent_card_route
+                ),
+                *jsonrpc_routes,
+                *rest_routes,
+            ]
+        )
 
     async def _start_grpc(self, plan: A2AServerInterfacePlan) -> None:
         """Start one official A2A gRPC service for each advertised listener."""

@@ -112,3 +112,68 @@ def test_startup_fails_when_scheme_family_has_no_authenticator():
     )
     with pytest.raises(ConfigurationError, match="no configured server authenticator"):
         service.validate_configuration()
+
+
+def test_security_context_builder_preserves_sdk_context_and_nebula_principals():
+    """Nebula authentication augments the official ServerCallContext."""
+
+    from starlette.requests import Request
+
+    from agent_nebula_platform.protocols.a2a.security.context import (
+        A2ASecurityServerCallContextBuilder,
+    )
+
+    service = A2AServerSecurityService(
+        agent_card=_card([SecurityRequirement(schemes={"first": StringList()})]),
+        authenticators=(_Authenticator("api_key_security_scheme", {"first"}),),
+    )
+    request = Request(
+        {
+            "type": "http",
+            "method": "POST",
+            "scheme": "https",
+            "server": ("agent.example", 443),
+            "path": "/a2a",
+            "query_string": b"",
+            "headers": [(b"x-first", b"secret")],
+        }
+    )
+
+    context = A2ASecurityServerCallContextBuilder(service).build(request)
+
+    assert context.state["headers"]["x-first"] == "secret"
+    principals = context.state["agent_nebula.security.principals"]
+    assert principals[0].scheme_name == "first"
+    assert principals[0].subject == "caller"
+
+
+def test_security_context_builder_maps_authentication_failure_to_http_401():
+    """Authentication failures stay at the HTTP boundary, not in A2A models."""
+
+    from starlette.exceptions import HTTPException
+    from starlette.requests import Request
+
+    from agent_nebula_platform.protocols.a2a.security.context import (
+        A2ASecurityServerCallContextBuilder,
+    )
+
+    service = A2AServerSecurityService(
+        agent_card=_card([SecurityRequirement(schemes={"first": StringList()})]),
+        authenticators=(_Authenticator("api_key_security_scheme", set()),),
+    )
+    request = Request(
+        {
+            "type": "http",
+            "method": "POST",
+            "scheme": "https",
+            "server": ("agent.example", 443),
+            "path": "/a2a",
+            "query_string": b"",
+            "headers": [],
+        }
+    )
+
+    with pytest.raises(HTTPException) as exc_info:
+        A2ASecurityServerCallContextBuilder(service).build(request)
+
+    assert exc_info.value.status_code == 401
