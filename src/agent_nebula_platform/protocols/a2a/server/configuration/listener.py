@@ -17,6 +17,7 @@ class A2AServerTlsConfiguration:
     trust_bundle: Path | None = None
     certificate_file: Path | None = None
     private_key_file: Path | None = None
+    require_client_certificate: bool = False
 
 
 @dataclass(frozen=True, slots=True)
@@ -71,9 +72,14 @@ class A2AListenerConfigurationLoader:
         trust_bundle = self._path(tls_table.get("trust_bundle"), path.parent)
         certificate = self._path(tls_table.get("certificate_file"), path.parent)
         private_key = self._path(tls_table.get("private_key_file"), path.parent)
+        require_client_certificate = self._boolean(tls_table, "require_client_certificate", default=False)
         if (certificate is None) != (private_key is None):
             raise ConfigurationError(
                 "A2A server TLS certificate_file and private_key_file must be configured together"
+            )
+        if require_client_certificate and (not enabled or trust_bundle is None):
+            raise ConfigurationError(
+                "A2A server mTLS requires TLS enabled with a trust_bundle"
             )
         if enabled and (certificate is None or private_key is None):
             raise ConfigurationError(
@@ -94,6 +100,7 @@ class A2AListenerConfigurationLoader:
                 trust_bundle=trust_bundle,
                 certificate_file=certificate,
                 private_key_file=private_key,
+                require_client_certificate=require_client_certificate,
             ),
         )
 

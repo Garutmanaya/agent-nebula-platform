@@ -115,3 +115,22 @@ SDK-generated protocol endpoints merely to enforce Nebula security.
 The public Agent Card route remains outside authenticated protocol-call context
 construction. Security requirements advertised by that card are enforced when the
 SDK builds the call context for A2A protocol operations.
+
+## Server security composition
+
+`A2AServerSecurityFactory` is the single Platform composition boundary for
+server-side A2A authentication. The official Agent Card remains authoritative for
+`securitySchemes` and `securityRequirements`; Agent Nebula supplies the configured
+credential validators without changing A2A wire models.
+
+OAuth2 is not a parallel server path. The factory delegates OAuth protected-resource
+construction to `A2AProtectedResourceFactory`, adapts that existing service through
+`A2AOAuth2ProtectedResourceAuthenticator`, and composes it into the same
+`A2AServerSecurityService` used by API-key, HTTP-auth, OpenID Connect, and mTLS
+adapters. Unsecured Agent Cards produce a security service whose `required` property
+is false, preserving existing unsecured server behavior.
+
+Scheme-specific authentication remains pluggable. The factory owns composition, not
+credential algorithms: generic verification stays in `agent-nebula-sdk`, A2A scheme
+adapters stay in Platform, and enforcement enters the official SDK server pipeline
+through `A2ASecurityServerCallContextBuilder`.

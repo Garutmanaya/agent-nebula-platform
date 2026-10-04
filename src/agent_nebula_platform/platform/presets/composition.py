@@ -19,10 +19,7 @@ from agent_nebula_platform.platform.presets.models import (
 )
 from agent_nebula_platform.platform.scheduler.plugin import SchedulerPlugin
 from agent_nebula_platform.platform.telemetry.plugin import TelemetryPlugin
-from agent_nebula_platform.protocols.a2a import (
-    A2AOAuth2ProtectedResourceAuthenticator,
-    A2AServerSecurityService,
-)
+from agent_nebula_platform.protocols.a2a import A2AServerSecurityFactory
 from agent_nebula_platform.protocols.a2a.server.plugin import A2AServerPlugin
 from agent_nebula_platform.security.oauth.client.plugin import OAuthClientPlugin
 from agent_nebula_platform.security.oauth.protected_resource.plugin import (
@@ -190,19 +187,17 @@ def compose_feature_plugins(
     if a2a_enabled and official_a2a_available:
         assert components.a2a_agent_card is not None
         assert components.a2a_request_handler is not None
-        authenticators = list(components.a2a_security_authenticators)
-        configured_types = {item.scheme_type for item in authenticators}
-        if (
-            components.protected_resource is not None
-            and "oauth2_security_scheme" not in configured_types
-        ):
-            authenticators.append(
-                A2AOAuth2ProtectedResourceAuthenticator(components.protected_resource)
-            )
-        security = A2AServerSecurityService(
-            agent_card=components.a2a_agent_card,
-            authenticators=tuple(authenticators),
-        )
+        security = components.a2a_security_service
+        if security is None:
+            # AGENT NEBULA SECURITY: embedded hosts may still inject individual
+            # authenticators. Route that legacy/pluggable seam through the same
+            # unified factory used by standalone SecureAgent composition.
+            security = A2AServerSecurityFactory().create(
+                agent_card=components.a2a_agent_card,
+                trust_bundle_file=None,
+                authenticators=components.a2a_security_authenticators,
+                protected_resource_service=components.protected_resource,
+            ).service
         plugins.append(
             A2AServerPlugin(
                 app=server.app,

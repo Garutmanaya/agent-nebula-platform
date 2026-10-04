@@ -22,7 +22,10 @@ from agent_nebula_platform.platform.metrics import MetricsRegistry
 from agent_nebula_platform.platform.plugins.base import RuntimePlugin
 from agent_nebula_platform.platform.scheduler import ScheduledJob
 from agent_nebula_platform.platform.telemetry import TelemetrySink
-from agent_nebula_platform.protocols.a2a import A2ASecuritySchemeAuthenticator
+from agent_nebula_platform.protocols.a2a import (
+    A2ASecuritySchemeAuthenticator,
+    A2AServerSecurityService,
+)
 from agent_nebula_platform.protocols.a2a.server.configuration.listener import (
     A2AServerTlsConfiguration,
 )
@@ -86,6 +89,7 @@ class RuntimeFeatureComponents:
     a2a_request_handler: RequestHandler | None = None
     a2a_server_tls: A2AServerTlsConfiguration | None = None
     a2a_security_authenticators: tuple[A2ASecuritySchemeAuthenticator, ...] = ()
+    a2a_security_service: A2AServerSecurityService | None = None
     a2ui_allowed_components: tuple[str, ...] = ()
     a2ui_allowed_functions: tuple[str, ...] = ()
     a2ui_allowed_catalog_ids: tuple[str, ...] = ()
@@ -115,6 +119,7 @@ class RuntimeFeatureComponents:
         a2a_request_handler: RequestHandler | None = None,
         a2a_server_tls: A2AServerTlsConfiguration | None = None,
         a2a_security_authenticators: Iterable[A2ASecuritySchemeAuthenticator] = (),
+        a2a_security_service: A2AServerSecurityService | None = None,
         a2ui_allowed_components: Sequence[str] = (),
         a2ui_allowed_functions: Sequence[str] = (),
         a2ui_allowed_catalog_ids: Sequence[str] = (),
@@ -143,6 +148,7 @@ class RuntimeFeatureComponents:
             a2a_request_handler=a2a_request_handler,
             a2a_server_tls=a2a_server_tls,
             a2a_security_authenticators=tuple(a2a_security_authenticators),
+            a2a_security_service=a2a_security_service,
             a2ui_allowed_components=tuple(a2ui_allowed_components),
             a2ui_allowed_functions=tuple(a2ui_allowed_functions),
             a2ui_allowed_catalog_ids=tuple(a2ui_allowed_catalog_ids),

@@ -22,6 +22,7 @@ from .client.client_security import (
     A2AClientSecurityResolver,
 )
 from .client.client_service import A2AClientServiceFactory
+from .security.factory import A2AServerSecurityComposition, A2AServerSecurityFactory
 from .security.oauth_security import A2AOAuth2ProtectedResourceAuthenticator
 from .security.security import (
     A2AAuthenticatedPrincipal,
@@ -51,6 +52,8 @@ __all__ = [
     "A2AOAuth2ProtectedResourceAuthenticator",
     "A2AOidcCredentialProvider",
     "A2ASecurityRequest",
+    "A2AServerSecurityComposition",
+    "A2AServerSecurityFactory",
     "A2ASecuritySchemeAuthenticator",
     "A2AServerAdapter",
     "A2AServerInterfacePlan",

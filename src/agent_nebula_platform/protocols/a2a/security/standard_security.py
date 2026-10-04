@@ -221,8 +221,14 @@ class A2AMutualTlsAuthenticator:
 
     scheme_type = "mtls_security_scheme"
 
-    def __init__(self, authenticator: MtlsClientCertificateAuthenticator) -> None:
+    def __init__(
+        self,
+        authenticator: MtlsClientCertificateAuthenticator,
+        *,
+        transport_enforced: bool = False,
+    ) -> None:
         self._authenticator = authenticator
+        self._transport_enforced = transport_enforced
 
     def authenticate(
         self,
@@ -235,14 +241,24 @@ class A2AMutualTlsAuthenticator:
         """Authenticate the TLS client certificate against configured trust anchors."""
         del scheme, required_values
         certificate = request.peer_certificate
-        if not isinstance(certificate, bytes) or not certificate:
-            raise AuthenticationError(
-                "A2A mTLS request is missing the TLS peer certificate"
+        if isinstance(certificate, bytes) and certificate:
+            try:
+                identity = self._authenticator.authenticate(certificate)
+            except AgentNebulaSdkError as exc:
+                raise AuthenticationError(
+                    "A2A mTLS client-certificate authentication failed"
+                ) from exc
+            return _principal(scheme_name=scheme_name, identity=identity)
+        # AGENT NEBULA SECURITY: Uvicorn validates the client certificate during
+        # the TLS handshake when CERT_REQUIRED is configured, but does not expose
+        # the peer certificate through the ASGI scope. Reaching the A2A route is
+        # therefore itself proof that transport authentication succeeded.
+        if self._transport_enforced:
+            return A2AAuthenticatedPrincipal(
+                scheme_name=scheme_name,
+                subject="mtls-transport-client",
+                attributes={"validated_by": "tls-handshake"},
             )
-        try:
-            identity = self._authenticator.authenticate(certificate)
-        except AgentNebulaSdkError as exc:
-            raise AuthenticationError(
-                "A2A mTLS client-certificate authentication failed"
-            ) from exc
-        return _principal(scheme_name=scheme_name, identity=identity)
+        raise AuthenticationError(
+            "A2A mTLS request is missing the TLS peer certificate"
+        )

@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import asyncio
 import signal
+import ssl
 import threading
 from collections.abc import Iterator
 from contextlib import contextmanager
@@ -74,6 +75,7 @@ class UvicornServerSettings:
     certificate_file: Path | None = None
     private_key_file: Path | None = None
     trust_bundle_file: Path | None = None
+    require_client_certificate: bool = False
     readiness_timeout_seconds: float = 30.0
     console_logging: bool = True
     log_level: str = "INFO"
@@ -119,13 +121,15 @@ class UvicornRuntimeServer:
                 "Uvicorn server support requires the 'standalone' package extra"
             ) from exc
 
-        tls_options: dict[str, str] = {}
+        tls_options: dict[str, Any] = {}
         if self._settings.certificate_file is not None:
             tls_options["ssl_certfile"] = str(self._settings.certificate_file)
         if self._settings.private_key_file is not None:
             tls_options["ssl_keyfile"] = str(self._settings.private_key_file)
         if self._settings.trust_bundle_file is not None:
             tls_options["ssl_ca_certs"] = str(self._settings.trust_bundle_file)
+        if self._settings.require_client_certificate:
+            tls_options["ssl_cert_reqs"] = ssl.CERT_REQUIRED
 
         log_config = None
         if self._settings.console_logging:

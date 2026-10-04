@@ -177,3 +177,53 @@ def test_security_context_builder_maps_authentication_failure_to_http_401():
         A2ASecurityServerCallContextBuilder(service).build(request)
 
     assert exc_info.value.status_code == 401
+
+
+def test_server_security_factory_keeps_unsecured_cards_transparent():
+    """Unified composition must not make authentication mandatory."""
+
+    from agent_nebula_platform.protocols.a2a.security import A2AServerSecurityFactory
+
+    card = _card([])
+    composition = A2AServerSecurityFactory().create(
+        agent_card=card,
+        trust_bundle_file=None,
+    )
+
+    assert composition.service.required is False
+    assert composition.protected_resource is None
+
+
+def test_server_security_factory_accepts_pluggable_standard_authenticators():
+    """Non-OAuth A2A schemes enter through the same server factory."""
+
+    from agent_nebula_platform.protocols.a2a.security import A2AServerSecurityFactory
+
+    card = _card([SecurityRequirement(schemes={"first": StringList()})])
+    composition = A2AServerSecurityFactory().create(
+        agent_card=card,
+        trust_bundle_file=None,
+        authenticators=(_Authenticator("api_key_security_scheme", {"first"}),),
+    )
+
+    assert composition.service.required is True
+    assert composition.service.authenticate(_request())[0].scheme_name == "first"
+
+
+def test_configured_security_loader_builds_api_key_authenticator(tmp_path):
+    from agent_nebula_platform.protocols.a2a.security import A2AConfiguredSecurityLoader
+    secret = tmp_path / "api-key"
+    secret.write_text("secret")
+    config = tmp_path / "a2aserver.conf"
+    config.write_text(f'''[agent_card]\nname="unused"\n[security.api_key.first]\nsecret_file="{secret}"\nsubject="configured-client"\n''')
+    authenticators = A2AConfiguredSecurityLoader().load(config)
+    assert len(authenticators) == 1
+    assert authenticators[0].scheme_type == "api_key_security_scheme"
+
+
+def test_listener_requires_trust_bundle_for_client_certificate_authentication(tmp_path):
+    from agent_nebula_platform.protocols.a2a.server.configuration.listener import A2AListenerConfigurationLoader
+    config = tmp_path / "a2aserver.conf"
+    config.write_text('''[server]\nhost="127.0.0.1"\nport=9999\n[server.tls]\nenabled=true\ncertificate_file="server.crt"\nprivate_key_file="server.key"\nrequire_client_certificate=true\n''')
+    with pytest.raises(ConfigurationError, match="mTLS requires"):
+        A2AListenerConfigurationLoader().load(config)

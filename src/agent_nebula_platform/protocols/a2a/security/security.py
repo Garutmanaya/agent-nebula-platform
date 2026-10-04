@@ -92,6 +92,10 @@ class A2AServerSecurityService:
                             "scheme_type": scheme_type,
                         },
                     )
+                authenticator = self._authenticators[scheme_type]
+                validate = getattr(authenticator, "validate_scheme", None)
+                if callable(validate):
+                    validate(scheme_name=scheme_name, scheme=scheme)
 
     def authenticate(
         self, request: A2ASecurityRequest

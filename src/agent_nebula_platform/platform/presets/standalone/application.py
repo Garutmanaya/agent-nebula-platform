@@ -37,6 +37,7 @@ class StandaloneAgent:
                 certificate_file=server.ssl_certificate_file,
                 private_key_file=server.ssl_private_key_file,
                 trust_bundle_file=server.ssl_trust_bundle_file,
+                require_client_certificate=server.ssl_require_client_certificate,
                 console_logging=self.settings.logging.console_enabled,
                 log_level=self.settings.logging.level,
             ),

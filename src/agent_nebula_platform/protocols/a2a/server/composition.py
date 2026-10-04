@@ -47,6 +47,10 @@ from agent_nebula_platform.protocols.a2a.extensions import (
     ensure_skill_selection_extension,
     validate_executable_skills,
 )
+from agent_nebula_platform.protocols.a2a.security import (
+    A2AConfiguredSecurityLoader,
+    A2AServerSecurityFactory,
+)
 from agent_nebula_platform.protocols.a2a.security.protected_resource import (
     A2AProtectedResourceComposition,
     A2AProtectedResourceFactory,
@@ -107,12 +111,22 @@ class A2AStandaloneApplicationComposer:
     def __init__(
         self,
         *,
+        security_factory: A2AServerSecurityFactory | None = None,
         protected_resource_factory: A2AProtectedResourceFactory | None = None,
     ) -> None:
-        """Accept replaceable factories for security composition and testing."""
+        """Accept replaceable factories for security composition and testing.
 
-        self._protected_resource_factory = (
-            protected_resource_factory or A2AProtectedResourceFactory()
+        ``protected_resource_factory`` remains accepted for compatibility with
+        callers that previously replaced only OAuth composition. It is now
+        delegated through the unified server-security factory.
+        """
+
+        if security_factory is not None and protected_resource_factory is not None:
+            raise ValueError(
+                "security_factory and protected_resource_factory are mutually exclusive"
+            )
+        self._security_factory = security_factory or A2AServerSecurityFactory(
+            protected_resource_factory=protected_resource_factory
         )
 
     def compose(
@@ -171,10 +185,19 @@ class A2AStandaloneApplicationComposer:
             task_store=InMemoryTaskStore(),
             agent_card=card,
         )
-        protected_resource = self._protected_resource_factory.create(
+        # AGENT NEBULA SECURITY: all A2A server authentication, including the
+        # existing OAuth protected-resource path, is composed through one factory.
+        # Applications and SecureAgent do not construct security services directly.
+        configured_authenticators = A2AConfiguredSecurityLoader().load(
+            server_config,
+            mtls_transport_enforced=listener.tls.require_client_certificate,
+        )
+        security = self._security_factory.create(
             agent_card=card,
             trust_bundle_file=listener.trust_bundle_file,
+            authenticators=configured_authenticators,
         )
+        protected_resource = security.protected_resource
         nebula = NebulaConfiguration.load(nebula_config) if nebula_config else None
         nebula_settings, onboarding_settings, payload_provider = self._nebula_components(
             nebula=nebula,
@@ -207,6 +230,7 @@ class A2AStandaloneApplicationComposer:
                 ssl_trust_bundle_file=(
                     listener.tls.trust_bundle if listener.tls.enabled else None
                 ),
+                ssl_require_client_certificate=listener.tls.require_client_certificate,
             ),
             nebula=nebula_settings,
             state=StandaloneStateSettings(directory=application.runtime_root / "state"),
@@ -246,6 +270,7 @@ class A2AStandaloneApplicationComposer:
             a2a_agent_card_route=server_configuration.agent_card_route,
             a2a_request_handler=handler,
             a2a_server_tls=listener.tls,
+            a2a_security_service=security.service,
         )
         nebula_connector = (
             NebulaConnectorFactory.create(nebula) if nebula is not None else None

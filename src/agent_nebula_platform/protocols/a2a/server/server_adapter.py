@@ -161,7 +161,7 @@ class A2AServerAdapter:
                         if self._tls.trust_bundle is not None
                         else None
                     ),
-                    require_client_auth=False,
+                    require_client_auth=self._tls.require_client_certificate,
                 )
                 bound_port = server.add_secure_port(interface.address, credentials)
             else:
