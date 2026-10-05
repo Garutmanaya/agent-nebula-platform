@@ -22,12 +22,10 @@ from agent_nebula_platform.platform.metrics import MetricsRegistry
 from agent_nebula_platform.platform.plugins.base import RuntimePlugin
 from agent_nebula_platform.platform.scheduler import ScheduledJob
 from agent_nebula_platform.platform.telemetry import TelemetrySink
-from agent_nebula_platform.protocols.a2a import (
+from agent_nebula_platform.a2a.config import A2AServerTlsConfiguration
+from agent_nebula_platform.a2a.security.server import (
     A2ASecuritySchemeAuthenticator,
     A2AServerSecurityService,
-)
-from agent_nebula_platform.protocols.a2a.server.configuration.listener import (
-    A2AServerTlsConfiguration,
 )
 from agent_nebula_platform.security.oauth.client import OAuthClientService
 from agent_nebula_platform.security.oauth.metadata import (

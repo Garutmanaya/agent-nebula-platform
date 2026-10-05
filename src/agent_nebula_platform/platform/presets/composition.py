@@ -19,8 +19,8 @@ from agent_nebula_platform.platform.presets.models import (
 )
 from agent_nebula_platform.platform.scheduler.plugin import SchedulerPlugin
 from agent_nebula_platform.platform.telemetry.plugin import TelemetryPlugin
-from agent_nebula_platform.protocols.a2a import A2AServerSecurityFactory
-from agent_nebula_platform.protocols.a2a.server.plugin import A2AServerPlugin
+from agent_nebula_platform.a2a.security import A2AServerSecurityFactory
+from agent_nebula_platform.a2a.server import A2AServerPlugin
 from agent_nebula_platform.security.oauth.client.plugin import OAuthClientPlugin
 from agent_nebula_platform.security.oauth.protected_resource.plugin import (
     ProtectedResourcePlugin,

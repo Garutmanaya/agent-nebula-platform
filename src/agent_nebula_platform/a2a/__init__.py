@@ -1,4 +1,8 @@
-"""Minimal Agent Nebula integration layer for the official A2A SDK."""
-from .client import A2AClient
-from .server import A2ASdkServerAdapter
-__all__ = ["A2AClient", "A2ASdkServerAdapter"]
+"""Agent Nebula integration layer for the official A2A SDK.
+
+Keep this package initializer side-effect free.  Configuration, security and
+runtime modules import one another through explicit submodules; eagerly
+importing the server here creates cycles while Platform presets are loading.
+"""
+
+__all__: list[str] = []

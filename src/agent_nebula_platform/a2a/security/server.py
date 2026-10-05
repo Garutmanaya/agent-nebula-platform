@@ -71,6 +71,11 @@ class A2AServerSecurityService:
     requirements are therefore authorized later, immediately before dispatch.
     """
 
+    # SECURITY BOUNDARY: credentials are validated exactly once at ingress.
+    # The trusted principals produced by that validation are the only input to
+    # later AgentSkill authorization.  In particular, a DPoP proof must never
+    # be replayed through an authenticator for a second policy check.
+    _PRINCIPALS_STATE_KEY = 'agent_nebula.security.principals'
     _REQUEST_STATE_KEY = 'agent_nebula.security.request'
 
     def __init__(self, *, agent_card: AgentCard, authenticators: tuple[A2ASecuritySchemeAuthenticator, ...]) -> None:
@@ -108,11 +113,27 @@ class A2AServerSecurityService:
             )
 
     def authenticate(self, request: A2ASecurityRequest) -> tuple[A2AAuthenticatedPrincipal, ...]:
-        """Authenticate the Agent Card-level requirement for an incoming call."""
-        return self._authenticate_requirements(
+        """Authenticate and authorize the AgentCard-level requirement.
+
+        NEBULA A2A SECURITY: A2A 1.0 advertises security schemes and
+        requirements, but credential validation is supplied by the deployment.
+        Nebula deliberately separates credential authentication from requirement
+        authorization.  Authenticators validate a scheme once with no policy
+        scopes; the requirement evaluator then checks scopes/values against the
+        trusted principal.  This is required for DPoP because trying multiple
+        policy alternatives must never re-submit the same proof to replay
+        detection.
+        """
+        principals: dict[str, A2AAuthenticatedPrincipal] = {}
+        failures: dict[str, AuthenticationError] = {}
+        self._satisfy_requirements(
             self._agent_card.security_requirements,
             request=request,
+            principals=principals,
+            failures=failures,
+            owner='AgentCard',
         )
+        return tuple(principals.values())
 
     def authorize_skill(
         self,
@@ -120,16 +141,21 @@ class A2AServerSecurityService:
         skill_id: str,
         call_context: ServerCallContext,
     ) -> tuple[A2AAuthenticatedPrincipal, ...]:
-        """Enforce a selected skill's security override before execution.
+        """Authenticate missing schemes once, then authorize the selected skill.
 
-        The a2a-sdk 1.1.5 ``RequestContext`` exposes the original
-        ``ServerCallContext`` through ``call_context``. The HTTP context builder
-        stores the transport security material there so authorization can happen
-        only after the skill-selection extension has identified the target skill.
+        NEBULA A2A SECURITY IMPLEMENTATION:
+        ``AgentCard.securityRequirements`` and
+        ``AgentSkill.securityRequirements`` are independent A2A 1.0 policy
+        declarations.  A skill may therefore require authentication even when
+        the AgentCard itself is public, or may require a different mechanism
+        from the AgentCard (for example agent=mTLS, skill=OAuth+API-key).
 
-        Skills without their own requirements inherit the already-enforced card
-        requirement and are not authenticated a second time. This is important
-        for request-bound credentials such as DPoP proofs.
+        Authentication results are cached by advertised scheme name for the
+        lifetime of this server call.  Existing results are always reused; only
+        a scheme not previously needed by the request may invoke its
+        authenticator.  Authorization may run repeatedly, but cryptographic
+        credential validation (including DPoP replay processing) runs at most
+        once per scheme per request.
         """
         skill = next((item for item in self._agent_card.skills if item.id == skill_id), None)
         if skill is None:
@@ -137,22 +163,110 @@ class A2AServerSecurityService:
         if not skill.security_requirements:
             return ()
 
-        request = call_context.state.get(self._REQUEST_STATE_KEY)
-        if not isinstance(request, A2ASecurityRequest):
-            raise AuthenticationError('A2A skill authorization is missing request security context')
-        return self._authenticate_requirements(
+        cached = call_context.state.get(self._PRINCIPALS_STATE_KEY, ())
+        if not isinstance(cached, tuple):
+            raise AuthenticationError('A2A authenticated security context has an invalid shape')
+        principals = {principal.scheme_name: principal for principal in cached}
+        security_request = call_context.state.get(self._REQUEST_STATE_KEY)
+        if security_request is not None and not isinstance(security_request, A2ASecurityRequest):
+            raise AuthenticationError('A2A request security context has an invalid shape')
+
+        authorized = self._satisfy_requirements(
             skill.security_requirements,
-            request=request,
+            request=security_request,
+            principals=principals,
+            failures={},
+            owner=f'AgentSkill {skill.id!r}',
+        )
+        # Persist every successful authentication, including a principal learned
+        # while evaluating an OR alternative that was not ultimately selected.
+        # A later policy check must reuse it rather than revalidate credentials.
+        call_context.state[self._PRINCIPALS_STATE_KEY] = tuple(principals.values())
+        return authorized
+
+    def _satisfy_requirements(
+        self,
+        requirements,
+        *,
+        request: A2ASecurityRequest | None,
+        principals: dict[str, A2AAuthenticatedPrincipal],
+        failures: dict[str, AuthenticationError],
+        owner: str,
+    ) -> tuple[A2AAuthenticatedPrincipal, ...]:
+        """Evaluate A2A OR-of-AND requirements with authenticate-once caching.
+
+        Each SecurityRequirement object is one OR alternative.  Every scheme in
+        that object is ANDed.  Scheme authentication is independent of policy
+        values/scopes; values are checked only after a trusted principal exists.
+        """
+        if not requirements:
+            return ()
+        for requirement in requirements:
+            authorized: list[A2AAuthenticatedPrincipal] = []
+            satisfied = True
+            for scheme_name, values in requirement.schemes.items():
+                principal = principals.get(scheme_name)
+                if principal is None:
+                    if scheme_name in failures:
+                        satisfied = False
+                        break
+                    if request is None:
+                        raise AuthenticationError(
+                            f'{owner} requires A2A scheme {scheme_name!r}, but request credential context is unavailable'
+                        )
+                    scheme = self._agent_card.security_schemes[scheme_name]
+                    scheme_type = scheme.WhichOneof('scheme')
+                    authenticator = self._authenticators.get(scheme_type or '')
+                    if authenticator is None:
+                        raise AuthenticationError(
+                            f'No authenticator is configured for A2A scheme {scheme_name!r}'
+                        )
+                    try:
+                        # AUTHENTICATION ONLY.  Policy scopes are intentionally
+                        # empty here.  OAuth/OIDC scope enforcement belongs below
+                        # so one DPoP proof cannot be consumed once per alternative.
+                        principal = authenticator.authenticate(
+                            scheme_name=scheme_name,
+                            scheme=scheme,
+                            required_values=(),
+                            request=request,
+                        )
+                    except AuthenticationError as exc:
+                        failures[scheme_name] = exc
+                        satisfied = False
+                        break
+                    principals[scheme_name] = principal
+
+                required_values = tuple(values.list)
+                if required_values and not self._principal_grants_values(principal, required_values):
+                    satisfied = False
+                    break
+                authorized.append(principal)
+            if satisfied:
+                return tuple(authorized)
+        raise AuthenticationError(
+            f'A2A request did not satisfy any advertised security requirement for {owner}'
         )
 
-    def remember_request(
-        self,
-        *,
-        call_context: ServerCallContext,
-        request: A2ASecurityRequest,
-    ) -> None:
-        """Preserve transport security material for later skill authorization."""
-        call_context.state[self._REQUEST_STATE_KEY] = request
+    @staticmethod
+    def _principal_grants_values(
+        principal: A2AAuthenticatedPrincipal,
+        required_values: tuple[str, ...],
+    ) -> bool:
+        """Evaluate trusted OAuth/OIDC scope values without credential validation."""
+        security = principal.attributes.get('security')
+        granted = getattr(security, 'granted_scopes', None)
+        if granted is None:
+            granted = principal.attributes.get('granted_scopes')
+        if granted is None:
+            granted = principal.attributes.get('scopes')
+        if isinstance(granted, str):
+            granted_values = set(granted.split())
+        elif granted is not None:
+            granted_values = set(granted)
+        else:
+            return False
+        return set(required_values).issubset(granted_values)
 
     def _validate_requirements(self, requirements, *, owner: str) -> None:
         for requirement in requirements:
@@ -178,43 +292,6 @@ class A2AServerSecurityService:
                 if callable(validate):
                     validate(scheme_name=scheme_name, scheme=scheme)
 
-    def _authenticate_requirements(
-        self,
-        requirements,
-        *,
-        request: A2ASecurityRequest,
-    ) -> tuple[A2AAuthenticatedPrincipal, ...]:
-        """Satisfy one advertised OR alternative; all schemes inside it are ANDed."""
-        if not requirements:
-            return ()
-        failures: list[str] = []
-        for requirement in requirements:
-            principals: list[A2AAuthenticatedPrincipal] = []
-            try:
-                for scheme_name, values in requirement.schemes.items():
-                    scheme = self._agent_card.security_schemes[scheme_name]
-                    scheme_type = scheme.WhichOneof('scheme')
-                    authenticator = self._authenticators.get(scheme_type or '')
-                    if authenticator is None:
-                        raise AuthenticationError(
-                            f'No authenticator is configured for A2A scheme {scheme_name!r}'
-                        )
-                    principals.append(
-                        authenticator.authenticate(
-                            scheme_name=scheme_name,
-                            scheme=scheme,
-                            required_values=tuple(values.list),
-                            request=request,
-                        )
-                    )
-            except AuthenticationError as exc:
-                failures.append(str(exc))
-                continue
-            return tuple(principals)
-        raise AuthenticationError(
-            'A2A request did not satisfy any advertised security requirement',
-            details={'alternatives': len(failures)},
-        )
 
 def _principal(*, scheme_name: str, identity: AuthenticatedIdentity) -> A2AAuthenticatedPrincipal:
     """Convert an SDK authenticated identity into Runtime's A2A security context."""
@@ -614,8 +691,6 @@ class A2ASecurityServerCallContextBuilder(DefaultServerCallContextBuilder):
     ``ServerCallContextBuilder`` extension point.  Route creation, request
     parsing, task handling, streaming, and dispatch remain owned by a2a-sdk.
     """
-    _PRINCIPALS_STATE_KEY = 'agent_nebula.security.principals'
-
     def __init__(self, security: A2AServerSecurityService) -> None:
         self._security = security
 
@@ -623,9 +698,10 @@ class A2ASecurityServerCallContextBuilder(DefaultServerCallContextBuilder):
         """Build the SDK context and authenticate requirements known at HTTP ingress.
 
         Card-level security is known before A2A payload dispatch and is enforced
-        here. Skill-level security cannot be selected yet because the skill ID is
-        carried in request metadata; request security material is therefore saved
-        in ``ServerCallContext.state`` for authorization by the skill dispatcher.
+        here.  Credential validation happens exactly once at this boundary.  The
+        resulting trusted principals are stored in ``ServerCallContext.state`` so
+        the later RequestHandler can evaluate skill policy without touching the
+        access token, DPoP proof, replay cache, or other credential material.
         """
         context = super().build(request)
         security_request = A2ASecurityRequest(
@@ -633,16 +709,18 @@ class A2ASecurityServerCallContextBuilder(DefaultServerCallContextBuilder):
             http_method=request.method,
             target_uri=str(request.url),
         )
-        if self._security.required or self._security.has_skill_requirements:
-            self._security.remember_request(
-                call_context=context,
-                request=security_request,
-            )
+        # NEBULA A2A SECURITY: retain normalized credential material only for the
+        # lifetime of this ServerCallContext.  A2A permits skill-only security,
+        # so the required scheme may not be known until RequestHandler resolves
+        # AgentSkill.securityRequirements.  This state must never be logged or
+        # persisted.  Authentication results are cached separately as principals.
+        context.state[self._security._REQUEST_STATE_KEY] = security_request
+        context.state[self._security._PRINCIPALS_STATE_KEY] = ()
         if not self._security.required:
             return context
         try:
             principals = self._security.authenticate(security_request)
         except AuthenticationError as exc:
             raise HTTPException(status_code=401, detail=str(exc)) from exc
-        context.state[self._PRINCIPALS_STATE_KEY] = principals
+        context.state[self._security._PRINCIPALS_STATE_KEY] = principals
         return context

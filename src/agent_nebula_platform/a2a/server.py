@@ -13,6 +13,8 @@ from urllib.parse import urlparse
 from a2a.types import AgentCard, AgentInterface
 from a2a.utils.constants import TransportProtocol
 from agent_nebula_platform.platform.errors import ConfigurationError
+from agent_nebula_platform.platform.context import RuntimeContext
+from agent_nebula_platform.platform.plugins.base import RuntimePlugin
 from pathlib import Path
 from typing import Any
 from a2a.server.request_handlers import RequestHandler
@@ -21,6 +23,7 @@ from a2a.server.routes.jsonrpc_routes import create_jsonrpc_routes
 from a2a.server.routes.rest_routes import create_rest_routes
 from a2a.types import AgentCard
 from fastapi import FastAPI
+
 
 @dataclass(frozen=True, slots=True)
 class A2AHttpInterface:
@@ -178,3 +181,59 @@ class A2ASdkServerAdapter:
             return path.read_bytes()
         except OSError as exc:
             raise ConfigurationError('Unable to read A2A server TLS material', details={'path': str(path)}) from exc
+
+
+
+class A2AServerPlugin(RuntimePlugin):
+    """Attach native a2a-sdk server interfaces inside Platform Runtime lifecycle.
+
+    This plugin intentionally lives in ``agent_nebula_platform.a2a``. Active
+    Runtime composition must not depend on the deprecated ``protocols.a2a``
+    implementation while examples are migrated to the official SDK.
+    """
+
+    def __init__(
+        self,
+        *,
+        app: FastAPI,
+        agent_card: AgentCard,
+        agent_card_route: str = '/.well-known/agent-card.json',
+        request_handler: RequestHandler,
+        required: bool = True,
+        security: A2AServerSecurityService | None = None,
+        tls: A2AServerTlsConfiguration | None = None,
+    ) -> None:
+        self._app = app
+        self._agent_card = agent_card
+        self._agent_card_route = agent_card_route
+        self._request_handler = request_handler
+        self._required = required
+        self._security = security
+        self._tls = tls or A2AServerTlsConfiguration()
+
+    @property
+    def name(self) -> str:
+        return 'a2a.server'
+
+    @property
+    def required(self) -> bool:
+        return self._required
+
+    async def initialize(self, context: RuntimeContext) -> None:
+        """Start only interfaces advertised by the official Agent Card."""
+        adapter = A2ASdkServerAdapter(
+            app=self._app,
+            agent_card=self._agent_card,
+            agent_card_route=self._agent_card_route,
+            request_handler=self._request_handler,
+            security=self._security,
+            tls=self._tls,
+        )
+        await adapter.start()
+        context.services.register(self.name, adapter)
+
+    async def close(self, context: RuntimeContext) -> None:
+        """Stop Runtime-owned A2A listeners and unregister the adapter."""
+        adapter = context.services.require(self.name, A2ASdkServerAdapter)
+        await adapter.close()
+        context.services.remove(self.name)
