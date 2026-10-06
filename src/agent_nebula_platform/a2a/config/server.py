@@ -154,6 +154,10 @@ class A2AServerConfigurationLoader:
 
     def load(self, path: Path) -> dict[str, Any]:
         """Read ``agent_card`` from ``path`` and return a defensive mapping copy."""
+        return self.load_section(path, "agent_card", required=True)
+
+    def load_section(self, path: Path, section: str, *, required: bool) -> dict[str, Any] | None:
+        """Read one Agent Card-shaped section from the external TOML file."""
         configuration_path = path.expanduser().resolve()
         if not configuration_path.is_file():
             raise ConfigurationError('A2A server configuration file does not exist', details={'path': str(configuration_path)})
@@ -162,10 +166,15 @@ class A2AServerConfigurationLoader:
                 document = tomllib.load(stream)
         except (OSError, tomllib.TOMLDecodeError) as exc:
             raise ConfigurationError('A2A server configuration file is invalid', details={'path': str(configuration_path)}) from exc
-        agent_card = document.get('agent_card')
-        if not isinstance(agent_card, Mapping):
-            raise ConfigurationError('A2A server configuration must contain an [agent_card] section', details={'path': str(configuration_path)})
-        return deepcopy(dict(agent_card))
+        value = document.get(section)
+        if value is None and not required:
+            return None
+        if not isinstance(value, Mapping):
+            raise ConfigurationError(
+                f'A2A server configuration must contain a [{section}] section',
+                details={'path': str(configuration_path)},
+            )
+        return deepcopy(dict(value))
 
 @dataclass(frozen=True, slots=True)
 class A2AServerConfiguration:
@@ -177,6 +186,7 @@ class A2AServerConfiguration:
     """
     agent_card: AgentCard
     agent_card_url: str
+    extended_agent_card: AgentCard | None = None
 
     @property
     def agent_card_route(self) -> str:
@@ -201,7 +211,17 @@ class A2AServerConfigurationService:
         parsed = urlparse(agent_card_url)
         if parsed.scheme not in {'http', 'https'} or not parsed.netloc or (not parsed.path.startswith('/')) or parsed.query or parsed.fragment:
             raise ConfigurationError('A2A server agent_card.url must be an absolute HTTP(S) URL without query or fragment', details={'value': agent_card_url})
-        return A2AServerConfiguration(agent_card=self._factory.create(configuration), agent_card_url=agent_card_url)
+        extended_configuration = self._loader.load_section(path, "extended_agent_card", required=False)
+        extended_agent_card = (
+            self._factory.create(extended_configuration)
+            if extended_configuration is not None
+            else None
+        )
+        return A2AServerConfiguration(
+            agent_card=self._factory.create(configuration),
+            agent_card_url=agent_card_url,
+            extended_agent_card=extended_agent_card,
+        )
 
     def load_agent_card(self, path: Path) -> AgentCard:
         """Load only the official Agent Card for compatibility with existing callers."""
