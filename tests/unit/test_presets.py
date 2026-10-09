@@ -218,13 +218,14 @@ tls_enabled = false
 
 [runtime.nebula]
 base_url = https://nebula.example
-ca_file = {tmp_path / "ca.pem"}
+ca_file = {product_root / "config/certs/ca.pem"}
 
 [runtime.state]
 directory = {state_root}
 
 [runtime.plugins]
 onboarding = false
+protected_resource = false
 """,
         encoding="utf-8",
     )

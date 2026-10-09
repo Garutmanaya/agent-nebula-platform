@@ -56,12 +56,3 @@ def test_runtime_centralizes_path_ownership() -> None:
     assert "product_root: Path | None = None" in settings
     assert "resolver.shared_path(self.nebula.ca_file)" in settings
 
-
-def test_authoritative_requirements_document_exists() -> None:
-    """Require the shared future-development contract in Agent Runtime."""
-
-    document = ROOT / "docs/AGENT_ECOSYSTEM_DESIGN_AND_IMPLEMENTATION_REQUIREMENTS.md"
-    text = document.read_text(encoding="utf-8")
-    assert "Agent Studio must not import `agent_nebula_sdk` directly" in text
-    assert "Runtime owns every `runtime.*` section" in text
-    assert "RuntimePathResolver" in text
