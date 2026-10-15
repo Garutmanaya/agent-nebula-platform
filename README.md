@@ -1,165 +1,57 @@
 # Agent Nebula Platform
 
-`agent-nebula-platform` is the pluggable runtime and integration layer used to build and host secure AI agents. It provides protocol adapters, security composition, skills, A2UI services, Agent Nebula integration, lifecycle management, configuration, health, telemetry, metrics, scheduling, and transport infrastructure without forcing every agent to use every capability.
+`agent-nebula-platform` is the reusable middleware between developer-facing [SecureAgent](https://github.com/garutmanaya/agent-nebula-secureagent), the official A2A Python SDK, and [Agent Nebula SDK](https://github.com/garutmanaya/agent-nebula-sdk) security primitives. It provides protocol integration, configuration, security composition and runtime services so agent authors can focus on skills rather than repeatedly implementing server lifecycle, authentication and observability.
 
-The repository sits between developer-facing agent APIs and the lower-level standards implementation:
+## Why use the Platform?
+
+Applications can select capabilities through plugins rather than adopting a monolithic agent server. The Platform composes A2A client/server operations, security requirements advertised by Agent Cards, OAuth clients and protected resources, skill invocation, A2UI, optional Registry onboarding, and operational services. Protocol handling remains with the official `a2a-sdk`; cryptographic and OAuth standards primitives remain in `agent-nebula-sdk`.
 
 ```text
-agent-nebula-secureagent
-        ↓
+SecureAgent / host application
+             |
 agent-nebula-platform
-        ↓
-agent-nebula-sdk
+  |-- a2a/              A2A SDK integration and Agent Card security
+  |-- security/oauth/   OAuth client, registration and protected resources
+  |-- skills/           Transport-neutral skill dispatch
+  |-- a2ui/             Declarative UI and action integration
+  |-- integrations/     Optional Agent Nebula onboarding
+  `-- platform/         Lifecycle, plugins, configuration, telemetry, metrics
+             |
+   official a2a-sdk + agent-nebula-sdk
 ```
 
-`agent-nebula-platform` depends on `agent-nebula-sdk` for reusable security and standards primitives. Platform code composes those primitives into operational capabilities such as OAuth clients and protected resources; it does not duplicate OAuth, JOSE, JWT, JWK, DPoP, or related RFC implementations.
+See [Platform architecture](docs/platform.md) and [documentation index](docs/README.md).
 
-The A2A integration uses the official `a2a-sdk` implementation and adds Platform-owned configuration, client/server integration, security interpretation, and lifecycle composition around it.
+## Protocols
 
-## What the Platform supports
+**A2A 1.0** is implemented using the official Python SDK, including client/server integration and security-scheme handling. **A2UI 1.0** provides declarative UI data and actions over A2A; it is not a separate agent transport. **MCP** is planned, not yet implemented. See [A2A](docs/a2a.md), [A2UI](docs/a2ui.md), and [MCP status](docs/mcp.md).
 
-The current codebase provides:
+## Security and authorization
 
-- official A2A 1.0 server and client integration;
-- A2A security-scheme interpretation and authentication integration;
-- OAuth client, dynamic client registration, authorization-server metadata, protected-resource metadata, and protected-resource services backed by `agent-nebula-sdk`;
-- typed, transport-neutral skills with exact scope requirements;
-- declarative A2UI surfaces, actions, sessions, validation, persistence, and capability negotiation;
-- optional Agent Nebula onboarding and registration integration;
-- embedded and standalone application composition;
-- deterministic plugin lifecycle with pre-server and post-server initialization phases;
-- FastAPI and HTTP transport infrastructure;
-- health/readiness, metrics, telemetry, scheduling, retry, events, execution tracing, state, and configuration services.
+The Platform interprets A2A Agent Card security declarations and composes supported authentication adapters with OAuth client and protected-resource services. It supports security integration for API keys, HTTP authentication, OAuth/OIDC and TLS/mTLS as configured by the host and advertised by the agent. Reusable OAuth, JOSE/JWT, JWK and DPoP primitives are delegated to `agent-nebula-sdk`; protected-resource authorization enforces exact required skill scopes. Optional [Agent Nebula](https://agentnebula.ai) integration enables hosted registration, discovery, OAuth and policy-managed access; those hosted services are distinct from the local Platform package. See [security](docs/security.md), [A2A security integration](docs/nebula-a2a-security.md) and [Registry integration](docs/integrations.md).
 
-MCP is a planned protocol integration boundary but is not implemented in the current repository. See [`docs/mcp.md`](docs/mcp.md).
+## Plugins and lifecycle
 
-## Repository structure
+Capabilities are assembled through `RuntimePlugin` and `PluginRegistry`, with pre-server and post-server initialization, required/optional failure handling, health/readiness, and reverse-order shutdown. Available plugin areas include skills, A2UI, OAuth clients, protected resources, client registration, Registry onboarding, metrics, telemetry and scheduling. See [plugins and lifecycle](docs/platform.md) for contracts and operational behavior.
 
-```text
-src/agent_nebula_platform/
-├── protocols/
-│   └── a2a/
-│       ├── client/             # A2A discovery, credentials, security and invocation
-│       ├── security/           # Agent Card security interpretation and authenticators
-│       └── server/             # A2A server adapter, execution and plugin integration
-├── security/
-│   └── oauth/
-│       ├── client/             # OAuth client runtime services
-│       ├── metadata/           # Authorization/resource metadata handling
-│       ├── protected_resource/ # Token validation, authorization and route protection
-│       └── registration/       # OAuth client registration integration
-├── skills/                     # Protocol-neutral skill model, registry and invocation
-├── a2ui/                       # Declarative UI, actions, sessions and validation
-├── integrations/
-│   └── nebula/                 # Optional Agent Nebula integration
-└── platform/
-    ├── plugins/                # Generic plugin contract and registry
-    ├── configuration/          # Configuration sources, paths and application config
-    ├── lifecycle/              # Host/server lifecycle integration
-    ├── presets/                # Embedded and standalone composition roots
-    ├── health/                 # Health/readiness services
-    ├── metrics/                # Metrics registry/exporters/plugin
-    ├── telemetry/              # Telemetry events, sinks and plugin
-    ├── scheduler/              # Scheduled jobs and plugin
-    ├── retry/                  # Retry policy/execution
-    ├── transport/              # FastAPI, HTTP and REST transport infrastructure
-    └── ...                     # Context, services, state, TLS, events and tracing
-```
+## Runtime configuration and filesystem permissions
 
-Protocol-specific behavior belongs under `protocols/`. Reusable operational security belongs under `security/`. Product-specific external integrations belong under `integrations/`. Generic runtime machinery belongs under `platform/`.
+The runtime path resolver provides **configured-root containment**, not an operating-system sandbox. `runtime_path()` confines paths to its configured runtime root; `shared_path()` may also permit the configured product root. The resolver does **not** enforce a global `/run/agent-nebula`-only rule, and Python code cannot prevent arbitrary filesystem access by other process components. For a deployment requiring writable runtime state **only** under `/run/agent-nebula`, configure that directory as the writable runtime mount and enforce restrictions with OS/container permissions and read-only mounts. Other paths may still be required read-only for Python packages, certificates and configuration. See [runtime and isolation](docs/runtime.md).
 
-## Plugin model
+## Observability and operations
 
-A Platform plugin implements `RuntimePlugin`. Every plugin has a stable `name`, a lifecycle boundary, a `required` policy, initialization/shutdown hooks, and health/readiness methods.
+The Platform provides plugin health/readiness, lifecycle events, metrics, telemetry, retry, scheduling and execution tracing. Enable and configure these capabilities in the host composition rather than assuming all are active by default. See [runtime services](docs/platform.md) and [observability](docs/observability.md).
 
-Two lifecycle boundaries are supported:
+## Install
 
-- `PRE_SERVER`: prepares local services, routes, security, skills, documents, and other resources before the listener becomes available.
-- `POST_SERVER`: initializes capabilities that require the agent endpoint to already be reachable, such as Agent Nebula onboarding that can cause a callback to the agent.
-
-`PluginRegistry` preserves deterministic registration order, rejects duplicate plugin names, and tracks lifecycle status. `AgentRuntime` initializes plugins in registration order and shuts them down in reverse order. A required plugin failure fails startup; an optional plugin failure is isolated and recorded.
-
-Concrete plugins remain with the capability they implement. For example:
-
-```text
-skills/plugin.py
-protocols/a2a/server/plugin.py
-security/oauth/client/plugin.py
-security/oauth/protected_resource/plugin.py
-integrations/nebula/onboarding/plugin.py
-a2ui/plugin.py
-platform/metrics/plugin.py
-```
-
-Only the generic plugin contract and registry live under `platform/plugins/`.
-
-## Combining plugins
-
-Applications may supply plugins directly to `AgentRuntime`, or use the embedded/standalone composition presets. The presets accept `RuntimeFeatureComponents` and plugin settings, determine which capabilities are available and enabled, and produce plugins in dependency-safe order.
-
-Conceptually:
-
-```python
-runtime = AgentRuntime(
-    context=context,
-    plugins=(
-        oauth_plugin,
-        protected_resource_plugin,
-        skills_plugin,
-        a2a_plugin,
-        server_plugin,
-        onboarding_plugin,
-    ),
-)
-
-await runtime.initialize_pre_server()
-# Start/listen when the host owns the server boundary.
-await runtime.initialize_post_server()
-```
-
-The preset composer follows the same model. A capability configured as `False` is omitted. A capability configured as `True` must have its required component or composition fails closed. A `None` setting enables the capability automatically when its required component is supplied.
-
-This keeps plugin selection explicit while allowing higher-level APIs to assemble a secure agent from configuration.
-
-## Dependency rules
-
-The repository follows these boundaries:
-
-```text
-SecureAgent → Platform → SDK
-```
-
-- Platform must not depend on `agent-nebula-secureagent`.
-- SDK must not depend on Platform.
-- Protocol modules may use Platform infrastructure and operational security services.
-- Platform security services delegate standards-level security behavior to `agent-nebula-sdk`.
-- Agent Nebula Registry integration is optional; A2A operation does not require Registry integration.
-
-## Documentation
-
-Detailed documentation is organized by capability:
-
-- [`docs/a2a.md`](docs/a2a.md) — A2A client, server, security and configuration architecture.
-- [`docs/security.md`](docs/security.md) — OAuth and security layering.
-- [`docs/skills.md`](docs/skills.md) — skill model, registration and invocation.
-- [`docs/a2ui.md`](docs/a2ui.md) — A2UI surfaces, actions, sessions and validation.
-- [`docs/integrations.md`](docs/integrations.md) — optional Agent Nebula integration.
-- [`docs/mcp.md`](docs/mcp.md) — MCP status and intended protocol boundary.
-- [`docs/platform.md`](docs/platform.md) — plugins, lifecycle, presets, configuration and operational services.
-
-## Development
-
-The project requires Python 3.12. In a sibling-repository workspace, `uv` can use the editable SDK source configured in `pyproject.toml`:
-
-```text
-workspace/
-├── agent-nebula-sdk/
-└── agent-nebula-platform/
-```
-
-Run validation with:
+Python 3.12 is required by the current `1.1.1` package metadata. When dependencies are available from the selected package index:
 
 ```bash
-make lint
-make test
+pip install agent-nebula-platform==1.1.1
 ```
+
+For examples and application-level usage, see the [SecureAgent examples repository](https://github.com/garutmanaya/agent-nebula-secureagent-examples) and the [documentation index](docs/README.md).
+
+## License
+
+Apache License 2.0. See [LICENSE](LICENSE).

@@ -98,7 +98,7 @@ Protocol configuration should remain with the protocol. Product integration conf
 
 ## Lifecycle and transport
 
-`platform/lifecycle/` connects runtime lifecycle to host/server lifecycle. `platform/transport/` contains reusable FastAPI, HTTP, HTTP-client, and REST infrastructure. These modules provide transport mechanics; protocol semantics remain under `protocols/`.
+`platform/lifecycle/` connects runtime lifecycle to host/server lifecycle. `platform/transport/` contains reusable FastAPI, HTTP, HTTP-client, and REST infrastructure. These modules provide transport mechanics; protocol semantics remain under `a2a/` (for A2A).
 
 ## Health
 
@@ -129,7 +129,7 @@ State services support runtime persistence concerns. Runtime events expose lifec
 Use this ownership test when adding code:
 
 ```text
-External protocol semantics?       → protocols/<protocol>/
+External protocol semantics?       → <protocol>/
 Reusable operational security?     → security/<mechanism>/
 Business capability invocation?    → skills/
 Declarative agent UI?              → a2ui/

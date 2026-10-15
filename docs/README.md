@@ -11,6 +11,8 @@ This directory documents the current `agent-nebula-platform` architecture by cap
 | Integrations | [integrations.md](integrations.md) | Optional Agent Nebula Registry integration |
 | MCP | [mcp.md](mcp.md) | Current MCP support status and protocol boundary |
 | Platform | [platform.md](platform.md) | Plugin lifecycle, composition, configuration, transport and operational services |
+| Runtime | [runtime.md](runtime.md) | Runtime roots, path containment and deployment filesystem isolation |
+| Observability | [observability.md](observability.md) | Health, readiness, metrics, telemetry and tracing |
 
 The dependency direction is:
 

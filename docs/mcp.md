@@ -2,7 +2,7 @@
 
 ## Current status
 
-MCP is not implemented in the current `agent-nebula-platform` source tree. There is no `protocols/mcp/` package, MCP plugin, MCP client/server adapter, or MCP configuration loader in this repository today.
+MCP is not implemented in the current `agent-nebula-platform` source tree. There is no `mcp/` package, MCP plugin, MCP client/server adapter, or MCP configuration loader in this repository today.
 
 The Platform architecture reserves MCP as a protocol integration category rather than treating it as a skill, security, or Agent Nebula Registry feature.
 
@@ -11,7 +11,7 @@ The Platform architecture reserves MCP as a protocol integration category rather
 When MCP support is added, MCP-specific code should be grouped under:
 
 ```text
-protocols/mcp/
+mcp/
 ├── client/
 ├── server/
 └── security/    # only MCP-specific security interpretation/adapters
@@ -39,7 +39,7 @@ MCP must not create a second business-skill registry or duplicate OAuth implemen
 
 ## Plugin model
 
-Any future MCP server/client runtime capability should participate through the same `RuntimePlugin` lifecycle used by A2A and other Platform capabilities. Concrete MCP plugins would remain under `protocols/mcp/`; only generic plugin contracts belong under `platform/plugins/`.
+Any future MCP server/client runtime capability should participate through the same `RuntimePlugin` lifecycle used by A2A and other Platform capabilities. If MCP is implemented, its concrete plugins would belong to the MCP integration; only generic plugin contracts belong under `platform/plugins/`.
 
 ## Registry independence
 

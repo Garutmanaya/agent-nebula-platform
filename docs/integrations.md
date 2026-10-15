@@ -45,4 +45,4 @@ Nebula registration authentication and agent endpoint OAuth security are separat
 
 ## Adding integrations
 
-A new external product integration should live under `integrations/<name>/` when it is product-specific. Generic protocols belong under `protocols/`; reusable security belongs under `security/`; generic lifecycle/configuration belongs under `platform/`.
+A new external product integration should live under `integrations/<name>/` when it is product-specific. Generic protocols belong under `a2a/` (for A2A); reusable security belongs under `security/`; generic lifecycle/configuration belongs under `platform/`.
