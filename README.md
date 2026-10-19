@@ -20,38 +20,38 @@ agent-nebula-platform
    official a2a-sdk + agent-nebula-sdk
 ```
 
-See [Platform architecture](docs/platform.md) and [documentation index](docs/README.md).
+See [Platform architecture](https://github.com/garutmanaya/agent-nebula-platform/blob/main/docs/platform.md) and [documentation index](https://github.com/garutmanaya/agent-nebula-platform/blob/main/docs/README.md).
 
 ## Protocols
 
-**A2A 1.0** is implemented using the official Python SDK, including client/server integration and security-scheme handling. **A2UI 1.0** provides declarative UI data and actions over A2A; it is not a separate agent transport. **MCP** is planned, not yet implemented. See [A2A](docs/a2a.md), [A2UI](docs/a2ui.md), and [MCP status](docs/mcp.md).
+**A2A 1.0** is implemented using the official Python SDK, including client/server integration and security-scheme handling. **A2UI 1.0** provides declarative UI data and actions over A2A; it is not a separate agent transport. **MCP** is planned, not yet implemented. See [A2A](https://github.com/garutmanaya/agent-nebula-platform/blob/main/docs/a2a.md), [A2UI](https://github.com/garutmanaya/agent-nebula-platform/blob/main/docs/a2ui.md), and [MCP status](https://github.com/garutmanaya/agent-nebula-platform/blob/main/docs/mcp.md).
 
 ## Security and authorization
 
-The Platform interprets A2A Agent Card security declarations and composes supported authentication adapters with OAuth client and protected-resource services. It supports security integration for API keys, HTTP authentication, OAuth/OIDC and TLS/mTLS as configured by the host and advertised by the agent. Reusable OAuth, JOSE/JWT, JWK and DPoP primitives are delegated to `agent-nebula-sdk`; protected-resource authorization enforces exact required skill scopes. Optional [Agent Nebula](https://agentnebula.ai) integration enables hosted registration, discovery, OAuth and policy-managed access; those hosted services are distinct from the local Platform package. See [security](docs/security.md), [A2A security integration](docs/nebula-a2a-security.md) and [Registry integration](docs/integrations.md).
+The Platform interprets A2A Agent Card security declarations and composes supported authentication adapters with OAuth client and protected-resource services. It supports security integration for API keys, HTTP authentication, OAuth/OIDC and TLS/mTLS as configured by the host and advertised by the agent. Reusable OAuth, JOSE/JWT, JWK and DPoP primitives are delegated to `agent-nebula-sdk`; protected-resource authorization enforces exact required skill scopes. Optional [Agent Nebula](https://agentnebula.ai) integration enables hosted registration, discovery, OAuth and policy-managed access; those hosted services are distinct from the local Platform package. See [security](https://github.com/garutmanaya/agent-nebula-platform/blob/main/docs/security.md), [A2A security integration](https://github.com/garutmanaya/agent-nebula-platform/blob/main/docs/nebula-a2a-security.md) and [Registry integration](https://github.com/garutmanaya/agent-nebula-platform/blob/main/docs/integrations.md).
 
 ## Plugins and lifecycle
 
-Capabilities are assembled through `RuntimePlugin` and `PluginRegistry`, with pre-server and post-server initialization, required/optional failure handling, health/readiness, and reverse-order shutdown. Available plugin areas include skills, A2UI, OAuth clients, protected resources, client registration, Registry onboarding, metrics, telemetry and scheduling. See [plugins and lifecycle](docs/platform.md) for contracts and operational behavior.
+Capabilities are assembled through `RuntimePlugin` and `PluginRegistry`, with pre-server and post-server initialization, required/optional failure handling, health/readiness, and reverse-order shutdown. Available plugin areas include skills, A2UI, OAuth clients, protected resources, client registration, Registry onboarding, metrics, telemetry and scheduling. See [plugins and lifecycle](https://github.com/garutmanaya/agent-nebula-platform/blob/main/docs/platform.md) for contracts and operational behavior.
 
 ## Runtime configuration and filesystem permissions
 
-The runtime path resolver provides **configured-root containment**, not an operating-system sandbox. `runtime_path()` confines paths to its configured runtime root; `shared_path()` may also permit the configured product root. The resolver does **not** enforce a global `/run/agent-nebula`-only rule, and Python code cannot prevent arbitrary filesystem access by other process components. For a deployment requiring writable runtime state **only** under `/run/agent-nebula`, configure that directory as the writable runtime mount and enforce restrictions with OS/container permissions and read-only mounts. Other paths may still be required read-only for Python packages, certificates and configuration. See [runtime and isolation](docs/runtime.md).
+The runtime path resolver provides **configured-root containment**, not an operating-system sandbox. `runtime_path()` confines paths to its configured runtime root; `shared_path()` may also permit the configured product root. The resolver does **not** enforce a global `/run/agent-nebula`-only rule, and Python code cannot prevent arbitrary filesystem access by other process components. For a deployment requiring writable runtime state **only** under `/run/agent-nebula`, configure that directory as the writable runtime mount and enforce restrictions with OS/container permissions and read-only mounts. Other paths may still be required read-only for Python packages, certificates and configuration. See [runtime and isolation](https://github.com/garutmanaya/agent-nebula-platform/blob/main/docs/runtime.md).
 
 ## Observability and operations
 
-The Platform provides plugin health/readiness, lifecycle events, metrics, telemetry, retry, scheduling and execution tracing. Enable and configure these capabilities in the host composition rather than assuming all are active by default. See [runtime services](docs/platform.md) and [observability](docs/observability.md).
+The Platform provides plugin health/readiness, lifecycle events, metrics, telemetry, retry, scheduling and execution tracing. Enable and configure these capabilities in the host composition rather than assuming all are active by default. See [runtime services](https://github.com/garutmanaya/agent-nebula-platform/blob/main/docs/platform.md) and [observability](https://github.com/garutmanaya/agent-nebula-platform/blob/main/docs/observability.md).
 
 ## Install
 
-Python 3.12 is required by the current `1.1.1` package metadata. When dependencies are available from the selected package index:
+Python 3.12 is required. The Platform supports Agent Nebula SDK 5.x. Install the latest published release:
 
 ```bash
-pip install agent-nebula-platform==1.1.1
+pip install agent-nebula-platform
 ```
 
-For examples and application-level usage, see the [SecureAgent examples repository](https://github.com/garutmanaya/agent-nebula-secureagent-examples) and the [documentation index](docs/README.md).
+For examples and application-level usage, see the [SecureAgent examples repository](https://github.com/garutmanaya/agent-nebula-secureagent-examples) and the [documentation index](https://github.com/garutmanaya/agent-nebula-platform/blob/main/docs/README.md).
 
 ## License
 
-Apache License 2.0. See [LICENSE](LICENSE).
+Apache License 2.0. See [LICENSE](https://github.com/garutmanaya/agent-nebula-platform/blob/main/LICENSE).
